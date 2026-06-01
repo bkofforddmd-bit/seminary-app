@@ -1001,7 +1001,10 @@ function TabBar({
 // ── SETUP TAB ──────────────────────────────────────────────────────
 function SetupTab({
   pacing,
-  onSave
+  onSave,
+  semester,
+  onSaveSemester,
+  onResetSemester
 }) {
   const [form, setForm] = useState(pacing || {
     course: "Morning Apex Stake Center",
@@ -1178,7 +1181,14 @@ function SetupTab({
       color: C.brown,
       marginBottom: 14
     }
-  }, "Semester Setup"), /*#__PURE__*/React.createElement(Card, {
+  }, "Semester Setup"),
+  /*#__PURE__*/React.createElement(SemesterConfig, {
+    semester: semester,
+    onSave: onSaveSemester,
+    onReset: onResetSemester
+  }),
+  /*#__PURE__*/React.createElement(GatheringLibraryViewer, null),
+  /*#__PURE__*/React.createElement(Card, {
     style: {
       marginBottom: 12,
       border: `1.5px solid ${importSuccess ? "#82b89a" : C.border}`,
@@ -1711,804 +1721,124 @@ function TodayTab({
 function BuildTab({
   initialLesson,
   onSync,
-  onSave
+  onSave,
+  semester
 }) {
-  var _content$keyVerses2, _content$prompts2, _content$activities2, _content$quotes2, _content$media2, _content$imagePrompts;
   const [ref, setRef] = useState("");
-  const [isCombined, setIsCombined] = useState(false);
-  const [combined, setCombined] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [err, setErr] = useState(null);
-  const [content, setContent] = useState(null);
   const [officialPdf, setOfficialPdf] = useState(null);
   const [officialPdfName, setOfficialPdfName] = useState("");
-  const [selected, setSelected] = useState([]);
-  const [expandedVerse, setExpandedVerse] = useState(null);
-  const [expandedAct, setExpandedAct] = useState(null);
+  const [framed, setFramed] = useState(null);
+
   useEffect(() => {
-    if (initialLesson !== null && initialLesson !== void 0 && initialLesson.title) setRef(initialLesson.title);else if (initialLesson !== null && initialLesson !== void 0 && initialLesson.ref) setRef(initialLesson.ref);
+    if (initialLesson !== null && initialLesson !== void 0 && initialLesson.title) setRef(initialLesson.title);
+    else if (initialLesson !== null && initialLesson !== void 0 && initialLesson.ref) setRef(initialLesson.ref);
   }, [initialLesson]);
+
+  // Keep Slides/Save in sync with the framed lesson.
   useEffect(() => {
-    onSync(content, selected);
-  }, [content, selected]);
-  const generate = async () => {
-    if (!ref.trim()) return;
-    setLoading(true);
-    setErr(null);
-    setContent(null);
-    setSelected([]);
-    try {
-      var _result$keyVerses, _result$prompts, _result$activities, _result$quotes;
-      const result = await generateLesson(ref.trim(), isCombined ? combined.trim() : null, officialPdf);
-      setContent(result);
-      const defaults = [];
-      (_result$keyVerses = result.keyVerses) === null || _result$keyVerses === void 0 || _result$keyVerses.forEach((_, i) => defaults.push(`v${i}`));
-      (_result$prompts = result.prompts) === null || _result$prompts === void 0 || _result$prompts.slice(0, 2).forEach((_, i) => defaults.push(`p${i}`));
-      (_result$activities = result.activities) === null || _result$activities === void 0 || _result$activities.slice(0, 1).forEach((_, i) => defaults.push(`a${i}`));
-      (_result$quotes = result.quotes) === null || _result$quotes === void 0 || _result$quotes.slice(0, 2).forEach((_, i) => defaults.push(`q${i}`));
-      setSelected(defaults);
-    } catch (e) {
-      setErr("Generation failed: " + (e && e.message ? e.message : String(e)));
-      console.error(e);
-    }
-    setLoading(false);
-  };
-  const toggle = id => setSelected(s => s.includes(id) ? s.filter(x => x !== id) : [...s, id]);
-  const totalTime = useMemo(() => {
-    var _content$keyVerses, _content$prompts, _content$activities, _content$quotes, _content$media;
-    if (!content) return 0;
-    let t = 0;
-    (_content$keyVerses = content.keyVerses) === null || _content$keyVerses === void 0 || _content$keyVerses.forEach((_, i) => {
-      if (selected.includes(`v${i}`)) t += 2;
-    });
-    (_content$prompts = content.prompts) === null || _content$prompts === void 0 || _content$prompts.forEach((p, i) => {
-      if (selected.includes(`p${i}`)) t += p.duration || 3;
-    });
-    (_content$activities = content.activities) === null || _content$activities === void 0 || _content$activities.forEach((a, i) => {
-      if (selected.includes(`a${i}`)) t += a.duration || 5;
-    });
-    (_content$quotes = content.quotes) === null || _content$quotes === void 0 || _content$quotes.forEach((_, i) => {
-      if (selected.includes(`q${i}`)) t += 1;
-    });
-    (_content$media = content.media) === null || _content$media === void 0 || _content$media.forEach((m, i) => {
-      if (selected.includes(`m${i}`)) t += m.duration || 3;
-    });
-    return t;
-  }, [selected, content]);
+    if (framed && onSync) onSync(framed, []);
+  }, [framed]);
+
   return /*#__PURE__*/React.createElement("div", {
-    style: {
-      padding: "14px 14px 52px",
-      maxWidth: 620,
-      margin: "0 auto"
-    }
-  }, /*#__PURE__*/React.createElement(Card, {
-    style: {
-      marginBottom: 11
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontWeight: 700,
-      fontSize: 13,
-      color: C.brown,
-      marginBottom: 9
-    }
-  }, "What are you teaching?"), /*#__PURE__*/React.createElement("input", {
-    value: ref,
-    onChange: e => setRef(e.target.value),
-    placeholder: "e.g.  Moses 1:1-11 \u2014 Our Divine Identity",
-    style: {
-      width: "100%",
-      fontSize: 13,
-      padding: "8px 11px",
-      borderRadius: 8,
-      border: `1.5px solid ${C.border}`,
-      fontFamily: "Georgia,serif",
-      marginBottom: 9
-    }
-  }), /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: "flex",
-      alignItems: "center",
-      gap: 8,
-      marginBottom: isCombined ? 9 : 0
-    }
-  }, /*#__PURE__*/React.createElement("input", {
-    type: "checkbox",
-    id: "cb",
-    checked: isCombined,
-    onChange: e => setIsCombined(e.target.checked),
-    style: {
-      cursor: "pointer"
-    }
-  }), /*#__PURE__*/React.createElement("label", {
-    htmlFor: "cb",
-    style: {
-      fontSize: 12,
-      color: C.muted,
-      cursor: "pointer"
-    }
-  }, "Combined lesson (two passages)")), isCombined && /*#__PURE__*/React.createElement("input", {
-    value: combined,
-    onChange: e => setCombined(e.target.value),
-    placeholder: "Second lesson reference...",
-    style: {
-      width: "100%",
-      fontSize: 13,
-      padding: "8px 11px",
-      borderRadius: 8,
-      border: `1.5px solid ${C.border}`,
-      fontFamily: "Georgia,serif"
-    }
-  })), /*#__PURE__*/React.createElement("div", {
-    style: { marginBottom: 12 }
+    style: { padding: "14px 14px 52px", maxWidth: 620, margin: "0 auto" }
   },
-    /*#__PURE__*/React.createElement("div", {
-      style: { fontSize: 12, fontWeight: 700, color: C.brown, marginBottom: 5 }
-    }, "📄 Official Lesson PDF (optional)"),
-    /*#__PURE__*/React.createElement("div", {
-      style: { fontSize: 11, color: C.muted, marginBottom: 7, lineHeight: 1.5 }
-    }, "Upload the official Church Seminary lesson PDF to keep the AI grounded in approved content."),
-    officialPdfName ? /*#__PURE__*/React.createElement("div", {
-      style: { display: "flex", alignItems: "center", gap: 8, padding: "7px 10px",
-        background: "#eef7f1", border: "1.5px solid #82b89a", borderRadius: 8, marginBottom: 6 }
-    },
-      /*#__PURE__*/React.createElement("span", { style: { fontSize: 12, color: "#2a6644", flex: 1 } },
-        "✓ ", officialPdfName),
+    // Official lesson PDF (optional) — kept from the original Build flow,
+    // passed through to per-segment AI fill for grounding.
+    /*#__PURE__*/React.createElement(Card, { style: { marginBottom: 11 } },
+      /*#__PURE__*/React.createElement("div", {
+        style: { fontSize: 12, fontWeight: 700, color: C.brown, marginBottom: 5 }
+      }, "\uD83D\uDCC4 Official Lesson PDF (optional)"),
+      /*#__PURE__*/React.createElement("div", {
+        style: { fontSize: 11, color: C.muted, marginBottom: 7, lineHeight: 1.5 }
+      }, "Upload the official Church Seminary lesson PDF to keep AI-filled blocks grounded in approved content."),
+      officialPdfName ? /*#__PURE__*/React.createElement("div", {
+        style: { display: "flex", alignItems: "center", gap: 8, padding: "7px 10px",
+          background: "#eef7f1", border: "1.5px solid #82b89a", borderRadius: 8 }
+      },
+        /*#__PURE__*/React.createElement("span", { style: { fontSize: 12, color: "#2a6644", flex: 1 } }, "\u2713 " + officialPdfName),
+        /*#__PURE__*/React.createElement("button", {
+          onClick: () => { setOfficialPdf(null); setOfficialPdfName(""); },
+          style: { background: "none", border: "none", color: C.muted, cursor: "pointer", fontSize: 13, padding: "0 4px" }
+        }, "\u2715")
+      ) : /*#__PURE__*/React.createElement("label", {
+        style: { display: "block", padding: "8px 12px", border: "1.5px dashed #c8a450",
+          borderRadius: 8, cursor: "pointer", textAlign: "center", fontSize: 12, color: C.muted, background: C.cream }
+      },
+        "\uD83D\uDCCE Tap to upload lesson PDF",
+        /*#__PURE__*/React.createElement("input", {
+          type: "file", accept: ".pdf", style: { display: "none" },
+          onChange: async e => {
+            const f = e.target.files[0]; if (!f) return;
+            const b64 = await new Promise((res, rej) => {
+              const r = new FileReader();
+              r.onload = () => res(r.result.split(",")[1]);
+              r.onerror = () => rej(new Error("Read failed"));
+              r.readAsDataURL(f);
+            });
+            setOfficialPdf(b64); setOfficialPdfName(f.name);
+            e.target.value = "";
+          }
+        })
+      )
+    ),
+
+    // The Phase 2-4 framing workflow (gathering + ordered segments +
+    // per-block AI fill + templates + N-passage combine + live time bar).
+    /*#__PURE__*/React.createElement(LessonFramingPanel, {
+      semester: semester,
+      officialPdfB64: officialPdf,
+      onFramedChange: setFramed
+    }),
+
+    // Save the framed lesson.
+    framed && framed.segments && framed.segments.length > 0 &&
       /*#__PURE__*/React.createElement("button", {
-        onClick: () => { setOfficialPdf(null); setOfficialPdfName(""); },
-        style: { background: "none", border: "none", color: C.muted, cursor: "pointer", fontSize: 13, padding: "0 4px" }
-      }, "✕")
-    ) : /*#__PURE__*/React.createElement("label", {
-      style: { display: "block", padding: "8px 12px", border: "1.5px dashed #c8a450",
-        borderRadius: 8, cursor: "pointer", textAlign: "center", fontSize: 12, color: C.muted,
-        background: C.cream }
-    },
-      "📎 Tap to upload lesson PDF",
-      /*#__PURE__*/React.createElement("input", {
-        type: "file", accept: ".pdf", style: { display: "none" },
-        onChange: async e => {
-          const f = e.target.files[0]; if (!f) return;
-          const b64 = await new Promise((res, rej) => {
-            const r = new FileReader();
-            r.onload = () => res(r.result.split(",")[1]);
-            r.onerror = () => rej(new Error("Read failed"));
-            r.readAsDataURL(f);
-          });
-          setOfficialPdf(b64); setOfficialPdfName(f.name);
-          e.target.value = "";
-        }
-      })
-    )
-  ),
-/*#__PURE__*/React.createElement("button", {
-    onClick: generate,
-    disabled: loading || !ref.trim() || !getApiKey(),
-    style: {
-      width: "100%",
-      padding: "12px",
-      border: "none",
-      borderRadius: 9,
-      cursor: loading || !ref.trim() ? "not-allowed" : "pointer",
-      background: loading || !ref.trim() ? "#c8bfaa" : C.brown,
-      color: loading || !ref.trim() ? "#8a7a60" : C.cream,
-      fontSize: 14,
-      fontWeight: 700,
-      fontFamily: "Georgia,serif",
-      marginBottom: 14,
-      boxShadow: loading || !ref.trim() ? "none" : "0 3px 10px rgba(0,0,0,.2)"
-    }
-  }, loading ? "✨  Generating your lesson…" : !getApiKey() ? "⚠️  Set API Key in Setup first" : "✨  Generate Full Lesson Content"), err && /*#__PURE__*/React.createElement("div", {
-    style: {
-      background: "#fef2f2",
-      border: `1.5px solid #f8b4b4`,
-      borderRadius: 8,
-      padding: "10px 12px",
-      fontSize: 13,
-      color: C.red,
-      marginBottom: 12
-    }
-  }, err), content && /*#__PURE__*/React.createElement("div", null,
-  /*#__PURE__*/React.createElement("div", { style: { display:"flex", gap:8, marginBottom:10 } },
-    /*#__PURE__*/React.createElement("button", {
-      onClick: () => { onSync && onSync(content, selected); onSave && onSave(content, ref); },
-      style: { flex:1, padding:"9px 14px", background:"#2a6644", color:"#fff", border:"none",
-        borderRadius:8, fontSize:13, fontWeight:700, fontFamily:"Georgia,serif", cursor:"pointer" }
-    }, "💾 Save Lesson"),
-    /*#__PURE__*/React.createElement("button", {
-      onClick: () => { setContent(null); setRef(""); setOfficialPdf(null); setOfficialPdfName(""); },
-      style: { padding:"9px 14px", background:"transparent", border:"1.5px solid #c8b890",
-        borderRadius:8, fontSize:12, color:"#7a6040", fontFamily:"Georgia,serif", cursor:"pointer" }
-    }, "New Lesson")
-  ),
-  /*#__PURE__*/React.createElement(Card, {
-    style: {
-      marginBottom: 11
-    }
-  }, /*#__PURE__*/React.createElement(TimeBar, {
-    used: totalTime
-  }), /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 11,
-      color: C.muted,
-      marginTop: 5
-    }
-  }, "Add ~5 min for opening prayer + roll. Target: 38\u201345 min of content.")), /*#__PURE__*/React.createElement(Card, {
-    style: {
-      marginBottom: 11,
-      background: "#fdf9f4",
-      border: `1.5px solid ${C.gold}`
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontFamily: "Georgia,serif",
-      fontWeight: 700,
-      fontSize: 17,
-      color: C.brown,
-      marginBottom: 4
-    }
-  }, content.title), /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 12,
-      color: C.muted,
-      fontStyle: "italic",
-      marginBottom: 7,
-      lineHeight: 1.5
-    }
-  }, "\uD83C\uDFAF ", content.objective), /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 13,
-      lineHeight: 1.65,
-      color: C.text,
-      marginBottom: 8
-    }
-  }, content.overview), content.teacherNote && /*#__PURE__*/React.createElement("div", {
-    style: {
-      background: "#f0e8d4",
-      border: `1px solid ${C.gold}`,
-      borderRadius: 7,
-      padding: "7px 10px",
-      fontSize: 12,
-      color: "#5a3800",
-      lineHeight: 1.5
-    }
-  }, "\uD83D\uDCA1 Teacher note: ", content.teacherNote)), /*#__PURE__*/React.createElement(Card, {
-    style: {
-      marginBottom: 11,
-      background: "#eef7f1",
-      border: "1.5px solid #82b89a"
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 11,
-      fontWeight: 700,
-      color: C.green,
-      textTransform: "uppercase",
-      letterSpacing: ".08em",
-      marginBottom: 7
-    }
-  }, "\uD83D\uDCDC Modern Language Summary"), /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 13,
-      lineHeight: 1.75,
-      color: C.text
-    }
-  }, content.modernSummary)), /*#__PURE__*/React.createElement(SectionLabel, {
-    icon: "\uD83D\uDD16",
-    label: "Key Verses",
-    sub: "\u2014 2 min each \xB7 check to include in slides"
-  }), (_content$keyVerses2 = content.keyVerses) === null || _content$keyVerses2 === void 0 ? void 0 : _content$keyVerses2.map((v, i) => {
-    var _v$crossRefs, _v$talkTopics;
-    const id = `v${i}`,
-      on = selected.includes(id),
-      exp = expandedVerse === id;
-    return /*#__PURE__*/React.createElement(Card, {
-      key: i,
-      style: {
-        marginBottom: 8,
-        border: `2px solid ${on ? C.gold : C.border}`,
-        background: on ? "#fdf9f0" : "#fff"
-      }
-    }, /*#__PURE__*/React.createElement("div", {
-      style: {
-        display: "flex",
-        gap: 9,
-        alignItems: "flex-start"
-      }
-    }, /*#__PURE__*/React.createElement("input", {
-      type: "checkbox",
-      checked: on,
-      onChange: () => toggle(id),
-      style: {
-        marginTop: 2,
-        cursor: "pointer",
-        width: 15,
-        height: 15,
-        flexShrink: 0
-      }
-    }), /*#__PURE__*/React.createElement("div", {
-      style: {
-        flex: 1
-      }
-    }, /*#__PURE__*/React.createElement("div", {
-      style: {
-        display: "flex",
-        justifyContent: "space-between",
-        alignItems: "flex-start",
-        marginBottom: 4
-      }
-    }, /*#__PURE__*/React.createElement("span", {
-      style: {
-        fontFamily: "Georgia,serif",
-        fontWeight: 700,
-        fontSize: 13,
-        color: C.brown
-      }
-    }, v.reference), /*#__PURE__*/React.createElement("button", {
-      onClick: () => setExpandedVerse(exp ? null : id),
-      style: {
-        border: "none",
-        background: "none",
-        cursor: "pointer",
-        fontSize: 11,
-        color: C.gold,
-        padding: 0,
-        fontWeight: 700,
-        whiteSpace: "nowrap"
-      }
-    }, exp ? "▲ less" : "▼ more")), /*#__PURE__*/React.createElement("div", {
-      style: {
-        fontSize: 12,
-        fontStyle: "italic",
-        color: "#4a3a20",
-        marginBottom: 4,
-        lineHeight: 1.55
-      }
-    }, "\"", v.kjvText, "\""), /*#__PURE__*/React.createElement("div", {
-      style: {
-        fontSize: 12.5,
-        color: C.blue,
-        lineHeight: 1.55,
-        marginBottom: exp ? 8 : 0
-      }
-    }, v.modern), exp && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
-      style: {
-        background: "#f7f5f0",
-        borderRadius: 6,
-        padding: "7px 9px",
-        fontSize: 12,
-        color: C.muted,
-        fontStyle: "italic",
-        lineHeight: 1.5,
-        marginBottom: 8
-      }
-    }, "\uD83D\uDCA1 ", v.insight), v.manualNote && /*#__PURE__*/React.createElement("div", {
-      style: {
-        background: "#fdf9f0",
-        borderRadius: 6,
-        padding: "7px 9px",
-        fontSize: 12,
-        color: "#92662a",
-        lineHeight: 1.5,
-        marginBottom: 8,
-        border: `1px solid #e8c87a`
-      }
-    }, "\uD83D\uDCDA Manual: ", v.manualNote), /*#__PURE__*/React.createElement("div", {
-      style: {
-        marginBottom: 8
-      }
-    }, /*#__PURE__*/React.createElement("div", {
-      style: {
-        fontSize: 11,
-        fontWeight: 700,
-        color: C.muted,
-        textTransform: "uppercase",
-        letterSpacing: ".06em",
-        marginBottom: 5
-      }
-    }, "Cross-References"), /*#__PURE__*/React.createElement("div", {
-      style: {
-        display: "flex",
-        flexWrap: "wrap",
-        gap: 4
-      }
-    }, (_v$crossRefs = v.crossRefs) === null || _v$crossRefs === void 0 ? void 0 : _v$crossRefs.map((r, ri) => /*#__PURE__*/React.createElement(Tag, {
-      key: ri,
-      label: r,
-      color: C.blue,
-      bg: "#eef5fb",
-      border: "#7ea8c9"
-    })))), ((_v$talkTopics = v.talkTopics) === null || _v$talkTopics === void 0 ? void 0 : _v$talkTopics.length) > 0 && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
-      style: {
-        fontSize: 11,
-        fontWeight: 700,
-        color: C.muted,
-        textTransform: "uppercase",
-        letterSpacing: ".06em",
-        marginBottom: 5
-      }
-    }, "Talk & Testimony Topics"), /*#__PURE__*/React.createElement("div", {
-      style: {
-        display: "flex",
-        flexWrap: "wrap",
-        gap: 4
-      }
-    }, v.talkTopics.map((t, ti) => /*#__PURE__*/React.createElement(Tag, {
-      key: ti,
-      label: t,
-      color: "#92662a",
-      bg: "#fdf6ec",
-      border: "#c8a46e"
-    }))))))));
-  }), /*#__PURE__*/React.createElement(SectionLabel, {
-    icon: "\uD83D\uDCAC",
-    label: "Discussion Prompts",
-    sub: "\u2014 select 1\u20132 per lesson"
-  }), (_content$prompts2 = content.prompts) === null || _content$prompts2 === void 0 ? void 0 : _content$prompts2.map((p, i) => {
-    const id = `p${i}`,
-      on = selected.includes(id),
-      tc = getColor(FORMAT_COLORS, p.format);
-    return /*#__PURE__*/React.createElement(Card, {
-      key: i,
-      style: {
-        marginBottom: 8,
-        border: `2px solid ${on ? C.gold : C.border}`,
-        background: on ? "#fdf9f0" : "#fff"
-      }
-    }, /*#__PURE__*/React.createElement("div", {
-      style: {
-        display: "flex",
-        gap: 9,
-        alignItems: "flex-start"
-      }
-    }, /*#__PURE__*/React.createElement("input", {
-      type: "checkbox",
-      checked: on,
-      onChange: () => toggle(id),
-      style: {
-        marginTop: 2,
-        cursor: "pointer",
-        width: 15,
-        height: 15,
-        flexShrink: 0
-      }
-    }), /*#__PURE__*/React.createElement("div", {
-      style: {
-        flex: 1
-      }
-    }, /*#__PURE__*/React.createElement("div", {
-      style: {
-        display: "flex",
-        gap: 6,
-        alignItems: "center",
-        marginBottom: 6,
-        flexWrap: "wrap"
-      }
-    }, /*#__PURE__*/React.createElement(Tag, {
-      label: p.format || "class",
-      color: tc.c,
-      bg: tc.bg,
-      border: tc.b
-    }), /*#__PURE__*/React.createElement("span", {
-      style: {
-        fontSize: 11,
-        color: C.muted
-      }
-    }, "\u23F1 ", p.duration || 3, " min")), /*#__PURE__*/React.createElement("div", {
-      style: {
-        fontSize: 13,
-        fontWeight: 600,
-        color: C.text,
-        lineHeight: 1.55,
-        marginBottom: 5
-      }
-    }, p.text), p.deepen && /*#__PURE__*/React.createElement("div", {
-      style: {
-        fontSize: 12,
-        color: C.muted,
-        fontStyle: "italic",
-        lineHeight: 1.45,
-        marginBottom: 4
-      }
-    }, "\u21AA ", p.deepen), p.tip && /*#__PURE__*/React.createElement("div", {
-      style: {
-        fontSize: 11.5,
-        color: "#92662a",
-        background: "#fdf6ec",
-        borderRadius: 5,
-        padding: "4px 8px",
-        lineHeight: 1.4
-      }
-    }, "\uD83C\uDFA4 ", p.tip))));
-  }), /*#__PURE__*/React.createElement(SectionLabel, {
-    icon: "\uD83C\uDFAE",
-    label: "Activities & Games",
-    sub: "\u2014 select 0\u20131"
-  }), (_content$activities2 = content.activities) === null || _content$activities2 === void 0 ? void 0 : _content$activities2.map((a, i) => {
-    const id = `a${i}`,
-      on = selected.includes(id),
-      exp = expandedAct === id,
-      tc = getColor(ACTIVITY_COLORS, a.tag);
-    return /*#__PURE__*/React.createElement(Card, {
-      key: i,
-      style: {
-        marginBottom: 8,
-        border: `2px solid ${on ? C.gold : C.border}`,
-        background: on ? "#fdf9f0" : "#fff"
-      }
-    }, /*#__PURE__*/React.createElement("div", {
-      style: {
-        display: "flex",
-        gap: 9,
-        alignItems: "flex-start"
-      }
-    }, /*#__PURE__*/React.createElement("input", {
-      type: "checkbox",
-      checked: on,
-      onChange: () => toggle(id),
-      style: {
-        marginTop: 2,
-        cursor: "pointer",
-        width: 15,
-        height: 15,
-        flexShrink: 0
-      }
-    }), /*#__PURE__*/React.createElement("div", {
-      style: {
-        flex: 1
-      }
-    }, /*#__PURE__*/React.createElement("div", {
-      style: {
-        display: "flex",
-        gap: 6,
-        alignItems: "center",
-        marginBottom: 5,
-        flexWrap: "wrap"
-      }
-    }, /*#__PURE__*/React.createElement(Tag, {
-      label: a.tag || "activity",
-      color: tc.c,
-      bg: tc.bg,
-      border: tc.b
-    }), /*#__PURE__*/React.createElement("span", {
-      style: {
-        fontFamily: "Georgia,serif",
-        fontWeight: 700,
-        fontSize: 13,
-        color: C.brown
-      }
-    }, a.name), /*#__PURE__*/React.createElement("span", {
-      style: {
-        fontSize: 11,
-        color: C.muted,
-        marginLeft: "auto"
-      }
-    }, "\u23F1 ", a.duration || 5, " min")), a.purpose && /*#__PURE__*/React.createElement("div", {
-      style: {
-        fontSize: 11.5,
-        color: C.muted,
-        fontStyle: "italic",
-        marginBottom: 5
-      }
-    }, "Purpose: ", a.purpose), /*#__PURE__*/React.createElement("button", {
-      onClick: () => setExpandedAct(exp ? null : id),
-      style: {
-        border: "none",
-        background: "none",
-        cursor: "pointer",
-        fontSize: 11,
-        color: C.gold,
-        padding: 0,
-        fontWeight: 700
-      }
-    }, exp ? "▲ hide steps" : "▼ show steps"), exp && /*#__PURE__*/React.createElement("div", {
-      style: {
-        marginTop: 7
-      }
-    }, /*#__PURE__*/React.createElement("div", {
-      style: {
-        fontSize: 12.5,
-        color: C.text,
-        lineHeight: 1.6,
-        marginBottom: 5,
-        whiteSpace: "pre-line"
-      }
-    }, a.steps), a.materials && a.materials !== "None" && /*#__PURE__*/React.createElement("div", {
-      style: {
-        fontSize: 11.5,
-        color: C.muted
-      }
-    }, "\uD83D\uDCE6 Materials: ", a.materials)))));
-  }), /*#__PURE__*/React.createElement(SectionLabel, {
-    icon: "\uD83D\uDCE3",
-    label: "Quotes",
-    sub: "\u2014 ~1 min each"
-  }), (_content$quotes2 = content.quotes) === null || _content$quotes2 === void 0 ? void 0 : _content$quotes2.map((q, i) => {
-    const id = `q${i}`,
-      on = selected.includes(id);
-    return /*#__PURE__*/React.createElement(Card, {
-      key: i,
-      style: {
-        marginBottom: 8,
-        border: `2px solid ${on ? C.gold : C.border}`,
-        background: on ? "#fdf9f0" : "#fff"
-      }
-    }, /*#__PURE__*/React.createElement("div", {
-      style: {
-        display: "flex",
-        gap: 9,
-        alignItems: "flex-start"
-      }
-    }, /*#__PURE__*/React.createElement("input", {
-      type: "checkbox",
-      checked: on,
-      onChange: () => toggle(id),
-      style: {
-        marginTop: 2,
-        cursor: "pointer",
-        width: 15,
-        height: 15,
-        flexShrink: 0
-      }
-    }), /*#__PURE__*/React.createElement("div", {
-      style: {
-        flex: 1
-      }
-    }, /*#__PURE__*/React.createElement("div", {
-      style: {
-        fontSize: 13,
-        fontStyle: "italic",
-        color: C.text,
-        lineHeight: 1.65,
-        marginBottom: 5
-      }
-    }, "\"", q.text, "\""), /*#__PURE__*/React.createElement("div", {
-      style: {
-        fontSize: 12,
-        fontWeight: 700,
-        color: C.brown
-      }
-    }, "\u2014 ", q.source, q.year ? ` (${q.year})` : ""), q.topic && /*#__PURE__*/React.createElement("div", {
-      style: {
-        fontSize: 11,
-        color: C.muted,
-        marginTop: 3
-      }
-    }, "\uD83D\uDD17 ", q.topic))));
-  }), /*#__PURE__*/React.createElement(SectionLabel, {
-    icon: "\uD83C\uDFAC",
-    label: "Media & Videos",
-    sub: "\u2014 Gospel Library links"
-  }), (_content$media2 = content.media) === null || _content$media2 === void 0 ? void 0 : _content$media2.map((m, i) => {
-    const id = `m${i}`,
-      on = selected.includes(id);
-    return /*#__PURE__*/React.createElement(Card, {
-      key: i,
-      style: {
-        marginBottom: 8,
-        border: `2px solid ${on ? C.gold : C.border}`,
-        background: on ? "#fdf9f0" : "#fff"
-      }
-    }, /*#__PURE__*/React.createElement("div", {
-      style: {
-        display: "flex",
-        gap: 9,
-        alignItems: "flex-start"
-      }
-    }, /*#__PURE__*/React.createElement("input", {
-      type: "checkbox",
-      checked: on,
-      onChange: () => toggle(id),
-      style: {
-        marginTop: 2,
-        cursor: "pointer",
-        width: 15,
-        height: 15,
-        flexShrink: 0
-      }
-    }), /*#__PURE__*/React.createElement("div", {
-      style: {
-        flex: 1
-      }
-    }, /*#__PURE__*/React.createElement("div", {
-      style: {
-        display: "flex",
-        gap: 6,
-        alignItems: "center",
-        marginBottom: 5,
-        flexWrap: "wrap"
-      }
-    }, /*#__PURE__*/React.createElement("span", {
-      style: {
-        fontSize: 15
-      }
-    }, m.kind === "video" ? "🎬" : m.kind === "image" ? "🖼" : "🎵"), /*#__PURE__*/React.createElement("span", {
-      style: {
-        fontFamily: "Georgia,serif",
-        fontWeight: 700,
-        fontSize: 13,
-        color: C.brown
-      }
-    }, m.title), /*#__PURE__*/React.createElement("span", {
-      style: {
-        fontSize: 11,
-        color: C.muted,
-        marginLeft: "auto"
-      }
-    }, "\u23F1 ", m.duration, " min")), /*#__PURE__*/React.createElement("div", {
-      style: {
-        fontSize: 12.5,
-        color: C.text,
-        lineHeight: 1.5,
-        marginBottom: 6
-      }
-    }, m.description), /*#__PURE__*/React.createElement("a", {
-      href: `https://www.churchofjesuschrist.org/search?query=${encodeURIComponent(m.search)}&lang=eng`,
-      target: "_blank",
-      rel: "noopener noreferrer",
-      style: {
-        fontSize: 11.5,
-        color: C.blue,
-        fontWeight: 600,
-        textDecoration: "none"
-      }
-    }, "\uD83D\uDD0D Search Gospel Library: \"", m.search, "\""))));
-  }), /*#__PURE__*/React.createElement(SectionLabel, {
-    icon: "\uD83C\uDFA8",
-    label: "AI Image Prompts",
-    sub: "\u2014 paste into Midjourney or DALL\xB7E"
-  }), (_content$imagePrompts = content.imagePrompts) === null || _content$imagePrompts === void 0 ? void 0 : _content$imagePrompts.map((ip, i) => /*#__PURE__*/React.createElement(Card, {
-    key: i,
-    style: {
-      marginBottom: 8,
-      background: "#f7f5f0"
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 11,
-      fontWeight: 700,
-      color: C.muted,
-      textTransform: "uppercase",
-      letterSpacing: ".06em",
-      marginBottom: 4
-    }
-  }, ip.for), /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 12.5,
-      color: C.text,
-      lineHeight: 1.55,
-      fontStyle: "italic",
-      userSelect: "all",
-      cursor: "text"
-    }
-  }, "\"", ip.prompt, "\""))), content.closingThought && /*#__PURE__*/React.createElement(Card, {
-    style: {
-      marginTop: 16,
-      background: "#fdf9f4",
-      border: `1.5px solid ${C.gold}`
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 11,
-      fontWeight: 700,
-      color: C.gold,
-      textTransform: "uppercase",
-      letterSpacing: ".08em",
-      marginBottom: 6
-    }
-  }, "\u271D Closing Thought"), /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 13,
-      lineHeight: 1.7,
-      color: C.text,
-      fontStyle: "italic"
-    }
-  }, content.closingThought))));
+        onClick: () => {
+          const title = (framed.refs && framed.refs[0]) || "Untitled lesson";
+          onSave && onSave(framed, title);
+        },
+        style: { width: "100%", marginTop: 12, padding: "11px", background: "#2a6644",
+          color: "#fff", border: "none", borderRadius: 9, fontSize: 13, fontWeight: 700,
+          fontFamily: "Georgia,serif", cursor: "pointer" }
+      }, "\uD83D\uDCBE Save Lesson")
+  );
 }
 
 // ── SLIDES TAB ─────────────────────────────────────────────────────
 function buildSlides(content, selected) {
   var _content$imagePrompts2, _content$keyVerses3, _content$prompts3, _content$activities3, _content$quotes3, _content$imagePrompts4;
   if (!content) return [];
+
+  // ── Framed-lesson shape (Phases 2–4): { refs, gathering, segments[] } ──
+  if (Array.isArray(content.segments) && content.refs) {
+    const fslides = [];
+    fslides.push({
+      type: "title", bg: C.brown, tc: C.gold, cc: C.cream,
+      title: (content.refs[0] || "Lesson"),
+      body: content.refs.length > 1 ? "Combined: " + content.refs.join("  +  ") : ""
+    });
+    if (content.gathering) {
+      fslides.push({
+        type: "section", bg: C.cream, tc: C.brown, cc: C.text,
+        title: "🧩 " + content.gathering.name,
+        body: content.gathering.instructions || ""
+      });
+    }
+    content.segments.forEach(s => {
+      const lines = [];
+      if (s.ai && s.ai.teach) lines.push(s.ai.teach);
+      else if (s.instructions) lines.push(s.instructions);
+      if (s.ai && s.ai.steps && s.ai.steps.length) lines.push(s.ai.steps.map(x => "• " + x).join("\n"));
+      if (s.ai && s.ai.prompts && s.ai.prompts.length) lines.push(s.ai.prompts.map(x => "❓ " + x).join("\n"));
+      fslides.push({
+        type: "section", bg: C.white, tc: C.brown, cc: C.text,
+        title: (s.icon ? s.icon + " " : "") + s.name + (s.minutes ? "  (" + s.minutes + " min)" : ""),
+        body: lines.join("\n\n")
+      });
+    });
+    return fslides;
+  }
+
   const slides = [];
   slides.push({
     type: "title",
@@ -2826,6 +2156,1127 @@ function SlidesTab({
 }
 
 // ── APP ROOT ───────────────────────────────────────────────────────
+
+// ╔═══════════════════════════════════════════════════════════════╗
+// ║  PHASE 1 — DATA FOUNDATION (folded in)                         ║
+// ╚═══════════════════════════════════════════════════════════════╝
+// ═══════════════════════════════════════════════════════════════════
+//  SEMINARY TOOLS — PHASE 1: DATA FOUNDATION
+//  Additive only. Paste these blocks into index.html as described in the
+//  integration notes at the bottom. Nothing here alters existing behavior.
+//
+//  Conventions matched from the existing file:
+//   • No-Babel React (React.createElement), Georgia serif
+//   • C color tokens (brown/gold/cream/etc.)
+//   • loadStorage/saveStorage over window.storage (artifact storage API)
+//   • Baked-in DEFAULT = source of truth; storage = optional override layer
+// ═══════════════════════════════════════════════════════════════════
+
+
+// ───────────────────────────────────────────────────────────────────
+//  1. SEMESTER CONFIG  (baked-in default; edit + redeploy each semester)
+//     Placeholder = last semester's block until next term is finalized.
+//     start/end are "HH:MM" 24h. days use the file's convention 1=Mon…5=Fri.
+// ───────────────────────────────────────────────────────────────────
+const DEFAULT_SEMESTER = {
+  label: "Old Testament · 2025–2026 (placeholder — last semester)",
+  startTime: "06:00",      // class start
+  endTime: "06:50",        // class end  → 50 min block (placeholder)
+  days: [1, 2, 3, 4, 5],   // Mon–Fri (next sem will be [1,2,3,4] @ 05:50–06:50)
+};
+
+// total class minutes, computed from start/end
+function semesterTotalMinutes(sem) {
+  const s = sem || DEFAULT_SEMESTER;
+  const [sh, sm] = (s.startTime || "06:00").split(":").map(Number);
+  const [eh, em] = (s.endTime || "06:50").split(":").map(Number);
+  const mins = (eh * 60 + em) - (sh * 60 + sm);
+  return mins > 0 ? mins : 50;
+}
+
+
+// ───────────────────────────────────────────────────────────────────
+//  2. GATHERING ACTIVITY LIBRARY  (baked-in; edit + redeploy to add games)
+//     Four categories. Each activity: id, name, category, minutes (FIXED),
+//     instructions (static, cold-readable so anyone can run it).
+//     ADD A GAME = add one object to GATHERING_LIBRARY. UI auto-updates.
+// ───────────────────────────────────────────────────────────────────
+const GATHERING_CATEGORIES = [
+  { id: "dm",      label: "Doctrinal Mastery", icon: "🎯" },
+  { id: "game",    label: "Games",             icon: "🎲" },
+  { id: "study",   label: "Study Time",        icon: "📖" },
+  { id: "getknow", label: "Getting to Know You", icon: "🤝" },
+];
+
+const GATHERING_LIBRARY = [
+  // ── Doctrinal Mastery ──
+  {
+    id: "g_dm_scripturechase",
+    name: "Scripture Chase",
+    category: "dm",
+    minutes: 6,
+    instructions:
+      "Call out a doctrinal mastery key phrase or topic. Students race to find the matching reference in their scriptures. First to find it, stands and reads it aloud. Repeat with several references as students trickle in.",
+  },
+  {
+    id: "g_dm_keyphrase",
+    name: "Key Phrase Pop Quiz",
+    category: "dm",
+    minutes: 5,
+    instructions:
+      "Read a doctrinal mastery reference aloud. Students try to recall the key phrase from memory. Then reveal it. Good for quick recall practice with a small early group.",
+  },
+  // ── Games ──
+  {
+    id: "g_game_dmgames",
+    name: "DM Game (TV)",
+    category: "game",
+    minutes: 8,
+    instructions:
+      "Open the Games tab and pick a doctrinal mastery game (Battleship, Robots, Forbidden Island, Plinko, etc.) to broadcast on the TV. Play until the majority of the class has arrived.",
+  },
+  // ── Study Time ──
+  {
+    id: "g_study_quiet",
+    name: "Quiet Personal Study",
+    category: "study",
+    minutes: 7,
+    instructions:
+      "Students read today's scripture block silently on their own as they arrive. Encourage them to mark one verse that stands out. Bridges directly into the lesson.",
+  },
+  // ── Getting to Know You ──
+  {
+    id: "g_gk_2truths",
+    name: "Two Truths and a Lie",
+    category: "getknow",
+    minutes: 6,
+    instructions:
+      "Each student (as they arrive) shares three statements about themselves — two true, one false. The group guesses which is the lie. Light, fast, and works with any number present.",
+  },
+  {
+    id: "g_gk_favorites",
+    name: "Favorites",
+    category: "getknow",
+    minutes: 5,
+    instructions:
+      "Pose a 'favorite ___' prompt (food, scripture story, vacation, etc.) and go around the early group sharing answers. Swap the prompt each day.",
+  },
+];
+
+
+// ───────────────────────────────────────────────────────────────────
+//  3. SEGMENT VOCABULARY  (the lesson-body building blocks)
+//     Teacher frames the skeleton from these; AI fills the aiFill ones.
+//     Each type: id, name, icon, defaultMinutes, fill, [readingLevel]
+//       fill: "ai"     → AI generates content for this slot
+//       fill: "static" → fixed instructions, no AI content (e.g. prayers)
+//     "custom" is the freeform escape hatch (teacher names it; no default).
+// ───────────────────────────────────────────────────────────────────
+const SEGMENT_TYPES = [
+  {
+    id: "opening_prayer",
+    name: "Opening Prayer",
+    icon: "🙏",
+    defaultMinutes: 2,
+    fill: "static",
+    instructions:
+      "Ask one of the students who arrived early to choose someone to offer the opening prayer. (Early arrivers get the privilege of calling on someone — a small reward for being on time.)",
+  },
+  {
+    id: "intro_hook",
+    name: "Intro Activity (Lesson Hook)",
+    icon: "🪝",
+    defaultMinutes: 5,
+    fill: "ai",
+    desc: "An opening on-ramp — a question, scenario, or hook that primes students for today's doctrine before study begins.",
+  },
+  {
+    id: "historical_context",
+    name: "Historical Context / Background",
+    icon: "🏛️",
+    defaultMinutes: 5,
+    fill: "ai",
+    readingLevel: "AP senior",
+    studentFacing: true,
+    desc: "Student-facing summary of the historical & cultural setting of today's scripture block, written at a high-school-senior AP level, ready to read aloud. Default placement: before the reading.",
+  },
+  {
+    id: "companionship_study",
+    name: "Companionship Scripture Study",
+    icon: "👥",
+    defaultMinutes: 8,
+    fill: "ai",
+    desc: "Paired reading of the day's scripture block with guiding questions for partnerships.",
+  },
+  {
+    id: "scripture_reading",
+    name: "Scripture Reading (Whole Class)",
+    icon: "📜",
+    defaultMinutes: 6,
+    fill: "ai",
+    desc: "Reading the scripture block together aloud as a class, with a focus prompt.",
+  },
+  {
+    id: "object_lesson",
+    name: "Object Lesson",
+    icon: "💡",
+    defaultMinutes: 7,
+    fill: "ai",
+    desc: "A physical demonstration or visual that illustrates a doctrinal point.",
+  },
+  {
+    id: "small_group",
+    name: "Small Group Discussion",
+    icon: "🗣️",
+    defaultMinutes: 8,
+    fill: "ai",
+    desc: "Break into small groups around a question or passage.",
+  },
+  {
+    id: "whole_class_discussion",
+    name: "Whole-Class Discussion",
+    icon: "💬",
+    defaultMinutes: 7,
+    fill: "ai",
+    desc: "Teacher-led discussion with the full group.",
+  },
+  {
+    id: "prophets_words",
+    name: "Words of Modern Prophets/Apostles + Discussion",
+    icon: "🎙️",
+    defaultMinutes: 8,
+    fill: "ai",
+    desc: "A conference talk excerpt or prophetic statement, followed by discussion.",
+  },
+  {
+    id: "dm_memorization",
+    name: "Doctrinal Mastery — Memorization",
+    icon: "🧠",
+    defaultMinutes: 6,
+    fill: "ai",
+    desc: "Teach the key scripture phrase plus memorization techniques and tricks.",
+  },
+  {
+    id: "dm_application",
+    name: "Doctrinal Mastery — Application",
+    icon: "⚖️",
+    defaultMinutes: 7,
+    fill: "ai",
+    desc: "Scenario practice: real-life situations where the doctrine applies, for students to work through.",
+  },
+  {
+    id: "glue_in",
+    name: "Glue-in / Scripture Marking / Linking",
+    icon: "✂️",
+    defaultMinutes: 6,
+    fill: "ai",
+    desc: "Hands-on study-journal work: glue-ins, marking passages, cross-referencing.",
+  },
+  {
+    id: "video",
+    name: "Video",
+    icon: "🎬",
+    defaultMinutes: 5,
+    fill: "ai",
+    desc: "A Church media clip or similar, with a watch-for prompt.",
+  },
+  {
+    id: "testimony_reflection",
+    name: "Testimony / Reflection",
+    icon: "🕊️",
+    defaultMinutes: 4,
+    fill: "ai",
+    desc: "Quiet reflection or sharing to close on the doctrine.",
+  },
+  {
+    id: "outro_activity",
+    name: "Outro Activity",
+    icon: "🏁",
+    defaultMinutes: 5,
+    fill: "ai",
+    desc: "A closing game or wrap-up — the bookend to the gathering activities.",
+  },
+  {
+    id: "closing_prayer",
+    name: "Closing Prayer",
+    icon: "🙏",
+    defaultMinutes: 2,
+    fill: "static",
+    instructions:
+      "Invite a student to choose someone to offer the closing prayer, or assign on the fly based on who is present.",
+  },
+  {
+    id: "custom",
+    name: "Custom Block (Freeform)",
+    icon: "✏️",
+    defaultMinutes: null,   // teacher sets time manually
+    fill: "static",
+    instructions: "",        // teacher writes their own
+    desc: "A freeform block you name and time yourself, for anything the menu doesn't cover.",
+  },
+];
+
+// helpers
+function segmentById(id) { return SEGMENT_TYPES.find(s => s.id === id) || null; }
+function categoryById(id) { return GATHERING_CATEGORIES.find(c => c.id === id) || null; }
+function gatheringByCategory(catId) { return GATHERING_LIBRARY.filter(a => a.category === catId); }
+
+
+// ───────────────────────────────────────────────────────────────────
+//  4. CONFIG OVERRIDE LAYER
+//     Baked-in DEFAULT_SEMESTER is the source of truth. If the teacher
+//     has saved a per-device override, layer it on top. Storage key is
+//     versioned to sit alongside the existing seminary_* keys.
+// ───────────────────────────────────────────────────────────────────
+const SEMESTER_STORE_KEY = "seminary_semester_v1";
+
+async function loadSemester() {
+  const override = await loadStorage(SEMESTER_STORE_KEY);
+  return override ? { ...DEFAULT_SEMESTER, ...override } : { ...DEFAULT_SEMESTER };
+}
+async function saveSemester(sem) {
+  await saveStorage(SEMESTER_STORE_KEY, sem);
+}
+async function resetSemesterToDefault() {
+  await saveStorage(SEMESTER_STORE_KEY, null);
+}
+
+
+// ───────────────────────────────────────────────────────────────────
+//  5. SEMESTER CONFIG EDITOR  (small UI; lives in the Setup tab)
+//     Lets the teacher view the baked-in default and optionally override
+//     start/end/days locally. Matches existing C tokens + Georgia serif.
+// ───────────────────────────────────────────────────────────────────
+function SemesterConfig({ semester, onSave, onReset }) {
+  const sem = semester || DEFAULT_SEMESTER;
+  const total = semesterTotalMinutes(sem);
+  const set = (k, v) => onSave({ ...sem, [k]: v });
+  const toggleDay = d =>
+    set("days", sem.days.includes(d) ? sem.days.filter(x => x !== d) : [...sem.days, d].sort());
+
+  return React.createElement(Card, { style: { marginBottom: 11 } },
+    React.createElement("div", {
+      style: { fontWeight: 700, fontSize: 13, color: C.brown, marginBottom: 4 }
+    }, "🕕 Class Time (this semester)"),
+    React.createElement("div", {
+      style: { fontSize: 11, color: C.muted, marginBottom: 10, lineHeight: 1.5 }
+    }, "Set once per semester. The lesson builder uses this as the hard time ceiling. Default is baked into the app for substitutes; changes here override on this device only."),
+
+    React.createElement("div", { style: { display: "flex", gap: 10, marginBottom: 10 } },
+      React.createElement("div", { style: { flex: 1 } },
+        React.createElement("div", { style: { fontSize: 11, color: C.muted, marginBottom: 3 } }, "Start"),
+        React.createElement("input", {
+          type: "time", value: sem.startTime,
+          onChange: e => set("startTime", e.target.value),
+          style: { width: "100%", fontSize: 13, padding: "7px 9px", borderRadius: 8,
+                   border: `1.5px solid ${C.border}`, fontFamily: "Georgia,serif" }
+        })
+      ),
+      React.createElement("div", { style: { flex: 1 } },
+        React.createElement("div", { style: { fontSize: 11, color: C.muted, marginBottom: 3 } }, "End"),
+        React.createElement("input", {
+          type: "time", value: sem.endTime,
+          onChange: e => set("endTime", e.target.value),
+          style: { width: "100%", fontSize: 13, padding: "7px 9px", borderRadius: 8,
+                   border: `1.5px solid ${C.border}`, fontFamily: "Georgia,serif" }
+        })
+      )
+    ),
+
+    React.createElement("div", { style: { fontSize: 11, color: C.muted, marginBottom: 4 } }, "Class days"),
+    React.createElement("div", { style: { display: "flex", gap: 6, marginBottom: 10 } },
+      WDAYS.map(d =>
+        React.createElement("button", {
+          key: d.n, onClick: () => toggleDay(d.n),
+          style: {
+            flex: 1, padding: "7px 0", borderRadius: 8, cursor: "pointer",
+            fontFamily: "Georgia,serif", fontSize: 12, fontWeight: 700,
+            border: `1.5px solid ${sem.days.includes(d.n) ? C.gold : C.border}`,
+            background: sem.days.includes(d.n) ? "rgba(200,164,80,.18)" : C.white,
+            color: sem.days.includes(d.n) ? C.brown : C.muted,
+          }
+        }, d.label)
+      )
+    ),
+
+    React.createElement("div", {
+      style: { display: "flex", justifyContent: "space-between", alignItems: "center",
+               padding: "8px 11px", background: C.cream, borderRadius: 8,
+               border: `1.5px solid ${C.border}` }
+    },
+      React.createElement("span", { style: { fontSize: 12, color: C.muted } }, "Total class block"),
+      React.createElement("span", { style: { fontSize: 14, fontWeight: 700, color: C.green } }, total + " min")
+    ),
+
+    onReset && React.createElement("button", {
+      onClick: onReset,
+      style: { marginTop: 9, background: "none", border: "none", color: C.muted,
+               fontSize: 11, cursor: "pointer", textDecoration: "underline",
+               fontFamily: "Georgia,serif" }
+    }, "Reset to baked-in default")
+  );
+}
+
+
+// ───────────────────────────────────────────────────────────────────
+//  6. ACTIVITY LIBRARY VIEWER  (read-only browse in Setup; confirms the
+//     baked-in library is loading. Editing the library = edit this file.)
+// ───────────────────────────────────────────────────────────────────
+function GatheringLibraryViewer() {
+  const [open, setOpen] = React.useState(null); // activity id whose instructions are shown
+  return React.createElement(Card, { style: { marginBottom: 11 } },
+    React.createElement("div", {
+      style: { fontWeight: 700, fontSize: 13, color: C.brown, marginBottom: 4 }
+    }, "🧩 Gathering Activity Library"),
+    React.createElement("div", {
+      style: { fontSize: 11, color: C.muted, marginBottom: 10, lineHeight: 1.5 }
+    }, "Warm-up activities for the trickle-in window. To add a game, edit GATHERING_LIBRARY in the app source and redeploy — it appears here automatically."),
+
+    GATHERING_CATEGORIES.map(cat => {
+      const items = gatheringByCategory(cat.id);
+      if (!items.length) return null;
+      return React.createElement("div", { key: cat.id, style: { marginBottom: 10 } },
+        React.createElement("div", {
+          style: { fontSize: 12, fontWeight: 700, color: C.muted, marginBottom: 5 }
+        }, cat.icon + " " + cat.label),
+        items.map(a =>
+          React.createElement("div", {
+            key: a.id,
+            style: { border: `1.5px solid ${C.border}`, borderRadius: 8,
+                     padding: "7px 10px", marginBottom: 5, background: C.white }
+          },
+            React.createElement("div", {
+              onClick: () => setOpen(open === a.id ? null : a.id),
+              style: { display: "flex", justifyContent: "space-between",
+                       alignItems: "center", cursor: "pointer" }
+            },
+              React.createElement("span", { style: { fontSize: 12.5, color: C.text } }, a.name),
+              React.createElement("span", { style: { fontSize: 11, color: C.muted } },
+                a.minutes + " min  " + (open === a.id ? "▲" : "▼"))
+            ),
+            open === a.id && React.createElement("div", {
+              style: { fontSize: 11.5, color: C.muted, marginTop: 6,
+                       lineHeight: 1.5, borderTop: `1px solid ${C.border}`, paddingTop: 6 }
+            }, a.instructions)
+          )
+        )
+      );
+    })
+  );
+}
+
+// ╔═══════════════════════════════════════════════════════════════╗
+// ║  PHASES 2–4 — FRAMING / AI-FILL / TEMPLATES (folded in)        ║
+// ╚═══════════════════════════════════════════════════════════════╝
+// ═══════════════════════════════════════════════════════════════════
+//  SEMINARY TOOLS — PHASES 2–4: LESSON FRAMING, AI-FILL, TEMPLATES
+//  Additive only. Builds on Phase 1 (DEFAULT_SEMESTER, GATHERING_LIBRARY,
+//  SEGMENT_TYPES, loadSemester/saveSemester, SemesterConfig, etc.).
+//
+//  Conventions matched from index.html + Phase 1:
+//   • No-Babel React (React.createElement), Georgia serif
+//   • C color tokens, Card/SectionLabel/Tag/TimeBar shared components
+//   • loadStorage/saveStorage over window.storage
+//   • Same /.netlify/functions/claude-proxy call shape + getApiKey()
+//   • Same truncated-JSON repair pattern as generateLesson/callExtractAPI
+//
+//  WHAT THIS ADDS
+//   PHASE 2  Lesson Framing UI — a skeleton builder. Teacher picks ONE
+//            gathering activity for the trickle-in window, then orders
+//            SEGMENT_TYPES blocks into the lesson body with editable
+//            minutes, live-totaled against the REAL semester ceiling
+//            (semesterTotalMinutes), replacing BuildTab's hardcoded 45.
+//   PHASE 3  AI-Fill Wiring — generateSegmentFill() fills ONE segment at a
+//            time, scoped to that segment's type/desc/readingLevel, so a
+//            "Historical Context" block reads differently from an "Object
+//            Lesson". Static blocks (prayers) render baked instructions.
+//   PHASE 4  Templates + N-Lesson Combine — save/load reusable skeletons,
+//            and frame a lesson from N scripture references (not just 2).
+// ═══════════════════════════════════════════════════════════════════
+
+
+// ───────────────────────────────────────────────────────────────────
+//  0. SMALL SHARED HELPERS  (mirror existing patterns)
+// ───────────────────────────────────────────────────────────────────
+
+// Unique-ish id for skeleton rows (segments can repeat, so index isn't enough)
+let _segUid = 0;
+function newSegUid() { return "seg_" + (Date.now().toString(36)) + "_" + (_segUid++); }
+
+// Reuse the exact JSON-repair approach from generateLesson/callExtractAPI so
+// truncated proxy responses degrade gracefully instead of throwing.
+function repairJSON(raw, fallback) {
+  const clean = (raw || "").replace(/^```json?\s*/i, "").replace(/```\s*$/, "").trim();
+  try { return JSON.parse(clean); } catch (e) {
+    let fixed = clean, cutAt = -1;
+    for (let i = fixed.length - 1; i > 20; i--) {
+      if (fixed[i] === "}" || fixed[i] === "]") { cutAt = i + 1; break; }
+    }
+    if (cutAt > 20) fixed = fixed.slice(0, cutAt);
+    let opens = 0, objOpens = 0;
+    for (const c of fixed) {
+      if (c === "[") opens++; else if (c === "]") opens--;
+      else if (c === "{") objOpens++; else if (c === "}") objOpens--;
+    }
+    for (let i = 0; i < opens; i++) fixed += "]";
+    for (let i = 0; i < objOpens; i++) fixed += "}";
+    try { return JSON.parse(fixed); } catch (e2) { return fallback; }
+  }
+}
+
+
+// ───────────────────────────────────────────────────────────────────
+//  PHASE 3 (defined first so Phase 2 UI can call it)
+//  AI-FILL: fill ONE segment, scoped to its type.
+//  Mirrors generateLesson's proxy shape exactly (same endpoint, key,
+//  model selection, error handling). Returns a small shape per segment:
+//    { teach: string, steps: [string], prompts: [string], minutesHint: n }
+//  Static segments never reach here — caller short-circuits on fill==="static".
+// ───────────────────────────────────────────────────────────────────
+async function generateSegmentFill(seg, lessonRef, opts) {
+  const o = opts || {};
+  const combinedRefs = o.combinedRefs || [];      // Phase 4: extra passages
+  const officialPdfB64 = o.officialPdfB64 || null;
+  const key = getApiKey();
+  if (!key) throw new Error("No API key set. Tap 'Set Key' in the banner above.");
+
+  const refLine = [lessonRef].concat(combinedRefs).filter(Boolean).join("  +  ");
+  const readingNote = seg.readingLevel
+    ? ` Write at a ${seg.readingLevel} reading level.` : "";
+  const studentFacingNote = seg.studentFacing
+    ? " This text is READ ALOUD to students, so write it as finished prose ready to read, not as notes to the teacher." : "";
+
+  const sys = "You are a Seminary teacher preparation assistant for The Church of Jesus Christ of Latter-day Saints with deep knowledge of the official seminary teacher manuals, General Conference talks, and scripture. You generate content for ONE specific portion of a lesson at a time. Be doctrinally sound, accurate, and engaging for high school students. Output only compact JSON.";
+
+  const pdfPrimer = officialPdfB64
+    ? "Use the official Seminary lesson PDF above as your PRIMARY source — follow its objectives, activities, and doctrinal emphasis. "
+    : "";
+
+  const task =
+    pdfPrimer +
+    `Generate content for ONLY this part of the lesson on ${refLine}:\n` +
+    `SEGMENT: "${seg.name}" — ${seg.desc || seg.instructions || ""}\n` +
+    `Target length: about ${seg.minutes} minutes of class time.` +
+    readingNote + studentFacingNote + "\n\n" +
+    `Return ONLY valid JSON, no markdown/backticks/preamble:\n` +
+    `{"teach":"the main content for this segment as finished prose (2-5 sentences for short blocks, more for study/discussion blocks)",` +
+    `"steps":["concrete things the teacher does, in order — empty array if not applicable"],` +
+    `"prompts":["discussion or reflection questions for students — empty array if not applicable"],` +
+    `"minutesHint":${seg.minutes}}`;
+
+  const userContent = officialPdfB64
+    ? [
+        { type: "document", source: { type: "base64", media_type: "application/pdf", data: officialPdfB64 } },
+        { type: "text", text: task }
+      ]
+    : task;
+
+  const resp = await fetch("/.netlify/functions/claude-proxy", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      apiKey: key,
+      model: officialPdfB64 ? "claude-sonnet-4-6" : "claude-haiku-4-5-20251001",
+      max_tokens: 1400,
+      system: sys,
+      messages: [{ role: "user", content: userContent }]
+    })
+  });
+  if (!resp.ok) {
+    let body = "";
+    try { const j = await resp.json(); body = j.error?.message || j.message || JSON.stringify(j); } catch (_) {}
+    throw new Error(`API ${resp.status}: ${body}`);
+  }
+  const data = await resp.json();
+  const textBlock = data.content && data.content.find(b => b.type === "text");
+  const raw = (textBlock && textBlock.text) || "{}";
+  const filled = repairJSON(raw, { teach: "Content generation was truncated. Tap regenerate.", steps: [], prompts: [], minutesHint: seg.minutes });
+  // normalize
+  return {
+    teach: filled.teach || "",
+    steps: Array.isArray(filled.steps) ? filled.steps : [],
+    prompts: Array.isArray(filled.prompts) ? filled.prompts : [],
+    minutesHint: filled.minutesHint || seg.minutes
+  };
+}
+
+
+// ───────────────────────────────────────────────────────────────────
+//  PHASE 4: TEMPLATE STORE  (reusable lesson skeletons)
+//  A skeleton = { gatheringId, segments:[{uid,typeId,minutes,
+//                 customName?, customInstructions?}] }
+//  Stored under a versioned key alongside the existing seminary_* keys.
+// ───────────────────────────────────────────────────────────────────
+const SKELETON_TEMPLATES_KEY = "seminary_skeleton_templates_v1";
+
+async function loadTemplates() {
+  const t = await loadStorage(SKELETON_TEMPLATES_KEY);
+  return Array.isArray(t) ? t : DEFAULT_SKELETON_TEMPLATES.slice();
+}
+async function saveTemplates(list) {
+  await saveStorage(SKELETON_TEMPLATES_KEY, list);
+}
+
+// A couple baked-in starting points so the picker is never empty.
+const DEFAULT_SKELETON_TEMPLATES = [
+  {
+    id: "tmpl_standard",
+    name: "Standard Scripture Day",
+    builtin: true,
+    skeleton: {
+      gatheringId: "g_study_quiet",
+      segments: [
+        { typeId: "opening_prayer",        minutes: 2 },
+        { typeId: "intro_hook",            minutes: 5 },
+        { typeId: "historical_context",    minutes: 5 },
+        { typeId: "companionship_study",   minutes: 8 },
+        { typeId: "whole_class_discussion",minutes: 7 },
+        { typeId: "prophets_words",        minutes: 8 },
+        { typeId: "testimony_reflection",  minutes: 4 },
+        { typeId: "closing_prayer",        minutes: 2 },
+      ]
+    }
+  },
+  {
+    id: "tmpl_dm",
+    name: "Doctrinal Mastery Day",
+    builtin: true,
+    skeleton: {
+      gatheringId: "g_dm_scripturechase",
+      segments: [
+        { typeId: "opening_prayer",   minutes: 2 },
+        { typeId: "intro_hook",       minutes: 4 },
+        { typeId: "dm_memorization",  minutes: 8 },
+        { typeId: "dm_application",   minutes: 10 },
+        { typeId: "small_group",      minutes: 8 },
+        { typeId: "testimony_reflection", minutes: 4 },
+        { typeId: "closing_prayer",   minutes: 2 },
+      ]
+    }
+  }
+];
+
+// Hydrate a stored skeleton's segments with fresh uids (uids are runtime-only).
+function hydrateSkeleton(skel) {
+  return {
+    gatheringId: skel.gatheringId || null,
+    segments: (skel.segments || []).map(s => ({
+      uid: newSegUid(),
+      typeId: s.typeId,
+      minutes: typeof s.minutes === "number" ? s.minutes : (segmentById(s.typeId)?.defaultMinutes || 5),
+      customName: s.customName || "",
+      customInstructions: s.customInstructions || "",
+    }))
+  };
+}
+// Strip uids back out for storage.
+function dehydrateSkeleton(skel) {
+  return {
+    gatheringId: skel.gatheringId || null,
+    segments: (skel.segments || []).map(s => ({
+      typeId: s.typeId,
+      minutes: s.minutes,
+      customName: s.customName || "",
+      customInstructions: s.customInstructions || "",
+    }))
+  };
+}
+
+
+// ───────────────────────────────────────────────────────────────────
+//  PHASE 2: GATHERING PICKER  (pick ONE warm-up for the trickle-in window)
+//  Reads the Phase 1 GATHERING_LIBRARY / GATHERING_CATEGORIES.
+// ───────────────────────────────────────────────────────────────────
+function GatheringPicker({ value, onChange }) {
+  const [openCat, setOpenCat] = React.useState(null);
+  const chosen = GATHERING_LIBRARY.find(a => a.id === value) || null;
+
+  return React.createElement(Card, { style: { marginBottom: 11 } },
+    React.createElement("div", {
+      style: { fontWeight: 700, fontSize: 13, color: C.brown, marginBottom: 4 }
+    }, "🧩 Gathering Activity (trickle-in window)"),
+    React.createElement("div", {
+      style: { fontSize: 11, color: C.muted, marginBottom: 9, lineHeight: 1.5 }
+    }, "Pick one warm-up to run as students arrive. Not counted in the lesson-body time below."),
+
+    chosen && React.createElement("div", {
+      style: { display: "flex", alignItems: "center", gap: 8, padding: "7px 10px",
+        background: "#eef7f1", border: "1.5px solid #82b89a", borderRadius: 8, marginBottom: 8 }
+    },
+      React.createElement("span", { style: { fontSize: 12.5, color: "#2a6644", flex: 1 } },
+        "✓ " + chosen.name + " · " + chosen.minutes + " min"),
+      React.createElement("button", {
+        onClick: () => onChange(null),
+        style: { background: "none", border: "none", color: C.muted, cursor: "pointer", fontSize: 13 }
+      }, "✕")
+    ),
+
+    GATHERING_CATEGORIES.map(cat => {
+      const items = gatheringByCategory(cat.id);
+      if (!items.length) return null;
+      const open = openCat === cat.id;
+      return React.createElement("div", { key: cat.id, style: { marginBottom: 6 } },
+        React.createElement("div", {
+          onClick: () => setOpenCat(open ? null : cat.id),
+          style: { display: "flex", justifyContent: "space-between", alignItems: "center",
+            cursor: "pointer", fontSize: 12, fontWeight: 700, color: C.muted, padding: "4px 0" }
+        },
+          React.createElement("span", null, cat.icon + " " + cat.label),
+          React.createElement("span", null, open ? "▲" : "▼")
+        ),
+        open && items.map(a =>
+          React.createElement("div", {
+            key: a.id,
+            onClick: () => { onChange(a.id); setOpenCat(null); },
+            style: {
+              border: `1.5px solid ${value === a.id ? C.gold : C.border}`,
+              background: value === a.id ? "rgba(200,164,80,.15)" : C.white,
+              borderRadius: 8, padding: "7px 10px", marginBottom: 5, cursor: "pointer"
+            }
+          },
+            React.createElement("div", { style: { display: "flex", justifyContent: "space-between" } },
+              React.createElement("span", { style: { fontSize: 12.5, color: C.text } }, a.name),
+              React.createElement("span", { style: { fontSize: 11, color: C.muted } }, a.minutes + " min")
+            ),
+            React.createElement("div", {
+              style: { fontSize: 11, color: C.muted, marginTop: 4, lineHeight: 1.45 }
+            }, a.instructions)
+          )
+        )
+      );
+    })
+  );
+}
+
+
+// ───────────────────────────────────────────────────────────────────
+//  PHASE 2: SEGMENT MENU  (add a body block to the skeleton)
+// ───────────────────────────────────────────────────────────────────
+function SegmentMenu({ onAdd }) {
+  const [open, setOpen] = React.useState(false);
+  return React.createElement("div", { style: { marginBottom: 11 } },
+    React.createElement("button", {
+      onClick: () => setOpen(o => !o),
+      style: {
+        width: "100%", padding: "10px", borderRadius: 9, cursor: "pointer",
+        border: `1.5px dashed ${C.gold}`, background: C.cream, color: C.brown,
+        fontFamily: "Georgia,serif", fontSize: 13, fontWeight: 700
+      }
+    }, open ? "▲  Choose a block to add" : "➕  Add a lesson block"),
+    open && React.createElement("div", { style: { marginTop: 8 } },
+      SEGMENT_TYPES.map(s =>
+        React.createElement("div", {
+          key: s.id,
+          onClick: () => { onAdd(s.id); setOpen(false); },
+          style: {
+            border: `1.5px solid ${C.border}`, borderRadius: 8, padding: "8px 10px",
+            marginBottom: 5, cursor: "pointer", background: C.white
+          }
+        },
+          React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 7 } },
+            React.createElement("span", { style: { fontSize: 15 } }, s.icon),
+            React.createElement("span", { style: { fontSize: 12.5, fontWeight: 700, color: C.brown, flex: 1 } }, s.name),
+            React.createElement(Tag, {
+              label: s.fill === "ai" ? "AI" : "fixed",
+              color: s.fill === "ai" ? C.purple : C.muted,
+              bg: s.fill === "ai" ? "#f3eefb" : "#f0ece4",
+              border: s.fill === "ai" ? "#a98bd4" : "#ccc"
+            }),
+            s.defaultMinutes != null && React.createElement("span", {
+              style: { fontSize: 11, color: C.muted }
+            }, s.defaultMinutes + "m")
+          ),
+          s.desc && React.createElement("div", {
+            style: { fontSize: 11, color: C.muted, marginTop: 3, lineHeight: 1.4 }
+          }, s.desc)
+        )
+      )
+    )
+  );
+}
+
+
+// ───────────────────────────────────────────────────────────────────
+//  PHASE 2 + 3: ONE SKELETON ROW
+//  Shows the block, its editable minutes, reorder/remove controls, and
+//  (Phase 3) its AI-fill output with a regenerate button. Static blocks
+//  render baked instructions; custom blocks expose name + instruction fields.
+// ───────────────────────────────────────────────────────────────────
+function SkeletonRow({ row, index, total, fill, fillState, onMove, onRemove, onMinutes, onCustom, onFill }) {
+  const seg = segmentById(row.typeId);
+  if (!seg) return null;
+  const isAI = seg.fill === "ai";
+  const isCustom = seg.id === "custom";
+  const st = fillState || {};   // { loading, error, data }
+
+  return React.createElement(Card, { style: { marginBottom: 9, padding: "10px 12px" } },
+    // header
+    React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 7, marginBottom: 6 } },
+      React.createElement("span", { style: { fontSize: 16 } }, seg.icon),
+      React.createElement("span", { style: { fontSize: 13, fontWeight: 700, color: C.brown, flex: 1 } },
+        isCustom && row.customName ? row.customName : seg.name),
+      // minutes editor
+      React.createElement("input", {
+        type: "number", min: 0, value: row.minutes,
+        onChange: e => onMinutes(row.uid, Math.max(0, parseInt(e.target.value || "0", 10))),
+        style: { width: 46, fontSize: 12, padding: "4px 6px", borderRadius: 6,
+          border: `1.5px solid ${C.border}`, fontFamily: "Georgia,serif", textAlign: "center" }
+      }),
+      React.createElement("span", { style: { fontSize: 11, color: C.muted } }, "min")
+    ),
+
+    // custom name + instructions
+    isCustom && React.createElement("div", { style: { marginBottom: 7 } },
+      React.createElement("input", {
+        value: row.customName || "", placeholder: "Name this block…",
+        onChange: e => onCustom(row.uid, "customName", e.target.value),
+        style: { width: "100%", fontSize: 12, padding: "6px 9px", borderRadius: 7,
+          border: `1.5px solid ${C.border}`, fontFamily: "Georgia,serif", marginBottom: 6 }
+      }),
+      React.createElement("textarea", {
+        value: row.customInstructions || "", placeholder: "What happens in this block…",
+        onChange: e => onCustom(row.uid, "customInstructions", e.target.value),
+        rows: 3,
+        style: { width: "100%", fontSize: 12, padding: "6px 9px", borderRadius: 7,
+          border: `1.5px solid ${C.border}`, fontFamily: "Georgia,serif", resize: "vertical" }
+      })
+    ),
+
+    // static instructions (prayers etc.)
+    !isCustom && seg.fill === "static" && seg.instructions && React.createElement("div", {
+      style: { fontSize: 11.5, color: C.muted, lineHeight: 1.5, marginBottom: 7,
+        background: C.cream, borderRadius: 7, padding: "7px 9px" }
+    }, seg.instructions),
+
+    // AI fill area
+    isAI && React.createElement("div", { style: { marginBottom: 7 } },
+      st.error && React.createElement("div", {
+        style: { fontSize: 11, color: C.red, marginBottom: 6 }
+      }, st.error),
+      st.data && React.createElement("div", {
+        style: { fontSize: 12, color: C.text, lineHeight: 1.55, background: "#f3eefb",
+          border: "1px solid #d9c8ee", borderRadius: 8, padding: "8px 10px", marginBottom: 6 }
+      },
+        st.data.teach && React.createElement("div", { style: { marginBottom: st.data.steps?.length || st.data.prompts?.length ? 6 : 0 } }, st.data.teach),
+        st.data.steps && st.data.steps.length > 0 && React.createElement("div", { style: { marginBottom: st.data.prompts?.length ? 6 : 0 } },
+          React.createElement("div", { style: { fontSize: 10.5, fontWeight: 700, color: C.purple, marginBottom: 2 } }, "STEPS"),
+          st.data.steps.map((s, i) => React.createElement("div", { key: i, style: { marginBottom: 2 } }, "• " + s))
+        ),
+        st.data.prompts && st.data.prompts.length > 0 && React.createElement("div", null,
+          React.createElement("div", { style: { fontSize: 10.5, fontWeight: 700, color: C.blue, marginBottom: 2 } }, "ASK"),
+          st.data.prompts.map((p, i) => React.createElement("div", { key: i, style: { marginBottom: 2 } }, "❓ " + p))
+        )
+      ),
+      React.createElement("button", {
+        onClick: () => onFill(row),
+        disabled: st.loading,
+        style: { fontSize: 11.5, padding: "5px 11px", borderRadius: 7, cursor: st.loading ? "wait" : "pointer",
+          border: `1.5px solid ${C.purple}`, background: st.loading ? "#efe6fa" : "#f3eefb",
+          color: C.purple, fontFamily: "Georgia,serif", fontWeight: 700 }
+      }, st.loading ? "✨ Filling…" : (st.data ? "↻ Regenerate this block" : "✨ Fill with AI"))
+    ),
+
+    // footer controls
+    React.createElement("div", { style: { display: "flex", gap: 6, justifyContent: "flex-end" } },
+      React.createElement("button", {
+        onClick: () => onMove(index, -1), disabled: index === 0,
+        style: ctrlBtn(index === 0)
+      }, "↑"),
+      React.createElement("button", {
+        onClick: () => onMove(index, 1), disabled: index === total - 1,
+        style: ctrlBtn(index === total - 1)
+      }, "↓"),
+      React.createElement("button", {
+        onClick: () => onRemove(row.uid),
+        style: { ...ctrlBtn(false), color: C.red, borderColor: "#e0b4ae" }
+      }, "✕")
+    )
+  );
+}
+function ctrlBtn(disabled) {
+  return {
+    width: 30, height: 26, borderRadius: 6, cursor: disabled ? "default" : "pointer",
+    border: `1.5px solid ${C.border}`, background: disabled ? "#f0ece4" : C.white,
+    color: disabled ? "#c8bfaa" : C.muted, fontSize: 12, fontFamily: "Georgia,serif"
+  };
+}
+
+
+// ───────────────────────────────────────────────────────────────────
+//  PHASES 2–4: THE FRAMING PANEL  (the whole skeleton-builder workflow)
+//  Drop this inside BuildTab (or render as its own tab). It owns:
+//   • the scripture ref(s) (Phase 4 N-combine)
+//   • the chosen gathering activity (Phase 2)
+//   • the ordered segment skeleton (Phase 2)
+//   • per-segment AI fill state (Phase 3)
+//   • template save/load (Phase 4)
+//   • live time accounting against the REAL semester ceiling
+//
+//  Props:
+//   semester        — from loadSemester() (Phase 1). Falls back to DEFAULT.
+//   officialPdfB64  — optional, passed through to AI fill (grounding)
+//   onFramedChange  — (framed) => void, lets BuildTab/Slides consume the
+//                     assembled lesson for syncing/printing.
+// ───────────────────────────────────────────────────────────────────
+function LessonFramingPanel({ semester, officialPdfB64, onFramedChange }) {
+  const sem = semester || DEFAULT_SEMESTER;
+  const ceiling = semesterTotalMinutes(sem);
+
+  // Phase 4: N references (first is primary; rest are "combined")
+  const [refs, setRefs] = React.useState([""]);
+  const primaryRef = refs[0] || "";
+  const extraRefs = refs.slice(1).map(r => r.trim()).filter(Boolean);
+
+  // Phase 2: gathering + skeleton
+  const [gatheringId, setGatheringId] = React.useState(null);
+  const [segments, setSegments] = React.useState([]);   // [{uid,typeId,minutes,customName,customInstructions}]
+
+  // Phase 3: fill state keyed by row uid → {loading,error,data}
+  const [fills, setFills] = React.useState({});
+
+  // Phase 4: templates
+  const [templates, setTemplates] = React.useState([]);
+  const [tmplName, setTmplName] = React.useState("");
+  const [savingTmpl, setSavingTmpl] = React.useState(false);
+
+  React.useEffect(() => { loadTemplates().then(setTemplates); }, []);
+
+  // ── time accounting ──
+  const bodyMinutes = segments.reduce((t, s) => t + (s.minutes || 0), 0);
+  const gathering = GATHERING_LIBRARY.find(a => a.id === gatheringId) || null;
+
+  // ── segment ops ──
+  const addSegment = typeId => {
+    const seg = segmentById(typeId);
+    setSegments(prev => [...prev, {
+      uid: newSegUid(), typeId,
+      minutes: seg && seg.defaultMinutes != null ? seg.defaultMinutes : 5,
+      customName: "", customInstructions: ""
+    }]);
+  };
+  const removeSegment = uid => {
+    setSegments(prev => prev.filter(s => s.uid !== uid));
+    setFills(prev => { const n = { ...prev }; delete n[uid]; return n; });
+  };
+  const moveSegment = (index, dir) => {
+    setSegments(prev => {
+      const next = prev.slice();
+      const j = index + dir;
+      if (j < 0 || j >= next.length) return prev;
+      [next[index], next[j]] = [next[j], next[index]];
+      return next;
+    });
+  };
+  const setMinutes = (uid, minutes) =>
+    setSegments(prev => prev.map(s => s.uid === uid ? { ...s, minutes } : s));
+  const setCustom = (uid, field, val) =>
+    setSegments(prev => prev.map(s => s.uid === uid ? { ...s, [field]: val } : s));
+
+  // ── Phase 3: fill one block ──
+  const fillOne = async row => {
+    const seg = segmentById(row.typeId);
+    if (!seg || seg.fill !== "ai") return;
+    setFills(prev => ({ ...prev, [row.uid]: { loading: true, error: null, data: prev[row.uid]?.data || null } }));
+    try {
+      const data = await generateSegmentFill(
+        { ...seg, minutes: row.minutes },
+        primaryRef.trim(),
+        { combinedRefs: extraRefs, officialPdfB64 }
+      );
+      setFills(prev => ({ ...prev, [row.uid]: { loading: false, error: null, data } }));
+    } catch (e) {
+      setFills(prev => ({ ...prev, [row.uid]: { loading: false, error: (e && e.message) || String(e), data: prev[row.uid]?.data || null } }));
+    }
+  };
+  // Fill every AI block in sequence (gentle on the proxy; avoids burst).
+  const [fillingAll, setFillingAll] = React.useState(false);
+  const fillAll = async () => {
+    setFillingAll(true);
+    for (const row of segments) {
+      const seg = segmentById(row.typeId);
+      if (seg && seg.fill === "ai") { await fillOne(row); }
+    }
+    setFillingAll(false);
+  };
+
+  // ── Phase 4: templates ──
+  const applyTemplate = tmpl => {
+    const hyd = hydrateSkeleton(tmpl.skeleton);
+    setGatheringId(hyd.gatheringId);
+    setSegments(hyd.segments);
+    setFills({});
+  };
+  const saveCurrentAsTemplate = async () => {
+    const name = tmplName.trim();
+    if (!name || !segments.length) return;
+    setSavingTmpl(true);
+    const entry = {
+      id: "tmpl_" + Date.now().toString(36),
+      name, builtin: false,
+      skeleton: dehydrateSkeleton({ gatheringId, segments })
+    };
+    const next = [entry, ...templates.filter(t => t.name !== name)];
+    setTemplates(next);
+    await saveTemplates(next);
+    setTmplName("");
+    setSavingTmpl(false);
+  };
+  const deleteTemplate = async id => {
+    const next = templates.filter(t => t.id !== id || t.builtin);
+    setTemplates(next);
+    await saveTemplates(next);
+  };
+
+  // ── publish framed lesson upward ──
+  React.useEffect(() => {
+    if (!onFramedChange) return;
+    onFramedChange({
+      refs: [primaryRef.trim()].concat(extraRefs).filter(Boolean),
+      gathering,
+      ceiling,
+      bodyMinutes,
+      segments: segments.map(s => {
+        const seg = segmentById(s.typeId);
+        return {
+          typeId: s.typeId,
+          name: s.typeId === "custom" && s.customName ? s.customName : (seg ? seg.name : s.typeId),
+          icon: seg ? seg.icon : "•",
+          minutes: s.minutes,
+          fill: seg ? seg.fill : "static",
+          instructions: s.typeId === "custom" ? s.customInstructions : (seg ? seg.instructions : ""),
+          ai: fills[s.uid]?.data || null
+        };
+      })
+    });
+  }, [primaryRef, segments, gatheringId, fills, ceiling]);
+
+  // ── render ──
+  return React.createElement("div", null,
+
+    // refs (Phase 4 N-combine)
+    React.createElement(Card, { style: { marginBottom: 11 } },
+      React.createElement("div", { style: { fontWeight: 700, fontSize: 13, color: C.brown, marginBottom: 9 } },
+        "What are you teaching?"),
+      refs.map((r, i) =>
+        React.createElement("div", { key: i, style: { display: "flex", gap: 6, marginBottom: 7 } },
+          React.createElement("input", {
+            value: r,
+            onChange: e => setRefs(prev => prev.map((x, j) => j === i ? e.target.value : x)),
+            placeholder: i === 0 ? "e.g.  Moses 1:1-11 — Our Divine Identity" : "Additional passage…",
+            style: { flex: 1, fontSize: 13, padding: "8px 11px", borderRadius: 8,
+              border: `1.5px solid ${C.border}`, fontFamily: "Georgia,serif" }
+          }),
+          i > 0 && React.createElement("button", {
+            onClick: () => setRefs(prev => prev.filter((_, j) => j !== i)),
+            style: { ...ctrlBtn(false), color: C.red, borderColor: "#e0b4ae", width: 34 }
+          }, "✕")
+        )
+      ),
+      React.createElement("button", {
+        onClick: () => setRefs(prev => [...prev, ""]),
+        style: { background: "none", border: "none", color: C.blue, fontSize: 11.5,
+          cursor: "pointer", textDecoration: "underline", fontFamily: "Georgia,serif", padding: 0 }
+      }, "+ combine another passage")
+    ),
+
+    // Phase 4: template bar
+    React.createElement(Card, { style: { marginBottom: 11 } },
+      React.createElement("div", { style: { fontWeight: 700, fontSize: 13, color: C.brown, marginBottom: 7 } },
+        "📐 Start from a template"),
+      React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 9 } },
+        templates.map(t =>
+          React.createElement("div", { key: t.id, style: { display: "flex", alignItems: "center" } },
+            React.createElement("button", {
+              onClick: () => applyTemplate(t),
+              style: { fontSize: 11.5, padding: "5px 10px", borderRadius: 7, cursor: "pointer",
+                border: `1.5px solid ${C.border}`, background: C.white, color: C.brown,
+                fontFamily: "Georgia,serif", fontWeight: 700 }
+            }, (t.builtin ? "★ " : "") + t.name),
+            !t.builtin && React.createElement("button", {
+              onClick: () => deleteTemplate(t.id),
+              style: { background: "none", border: "none", color: C.muted, cursor: "pointer", fontSize: 12, padding: "0 3px" }
+            }, "✕")
+          )
+        )
+      ),
+      React.createElement("div", { style: { display: "flex", gap: 6 } },
+        React.createElement("input", {
+          value: tmplName, onChange: e => setTmplName(e.target.value),
+          placeholder: "Save current layout as…",
+          style: { flex: 1, fontSize: 12, padding: "7px 10px", borderRadius: 7,
+            border: `1.5px solid ${C.border}`, fontFamily: "Georgia,serif" }
+        }),
+        React.createElement("button", {
+          onClick: saveCurrentAsTemplate,
+          disabled: !tmplName.trim() || !segments.length || savingTmpl,
+          style: { fontSize: 12, padding: "7px 12px", borderRadius: 7,
+            cursor: (!tmplName.trim() || !segments.length) ? "not-allowed" : "pointer",
+            border: "none", background: (!tmplName.trim() || !segments.length) ? "#c8bfaa" : C.brown,
+            color: C.cream, fontFamily: "Georgia,serif", fontWeight: 700 }
+        }, "Save")
+      )
+    ),
+
+    // Phase 2: gathering
+    React.createElement(GatheringPicker, { value: gatheringId, onChange: setGatheringId }),
+
+    // Phase 2: live time bar against REAL ceiling
+    React.createElement(Card, { style: { marginBottom: 11 } },
+      React.createElement(LessonTimeBar, { used: bodyMinutes, total: ceiling, semLabel: sem.label }),
+      gathering && React.createElement("div", {
+        style: { fontSize: 11, color: C.muted, marginTop: 7 }
+      }, "Plus " + gathering.minutes + " min gathering (" + gathering.name + ") during trickle-in.")
+    ),
+
+    // Phase 2/3: skeleton rows
+    segments.map((row, i) =>
+      React.createElement(SkeletonRow, {
+        key: row.uid, row, index: i, total: segments.length,
+        fillState: fills[row.uid],
+        onMove: moveSegment, onRemove: removeSegment,
+        onMinutes: setMinutes, onCustom: setCustom, onFill: fillOne
+      })
+    ),
+
+    // add block
+    React.createElement(SegmentMenu, { onAdd: addSegment }),
+
+    // Phase 3: fill-all
+    segments.some(s => segmentById(s.typeId)?.fill === "ai") &&
+      React.createElement("button", {
+        onClick: fillAll, disabled: fillingAll || !primaryRef.trim(),
+        style: { width: "100%", padding: "12px", border: "none", borderRadius: 9,
+          cursor: (fillingAll || !primaryRef.trim()) ? "not-allowed" : "pointer",
+          background: (fillingAll || !primaryRef.trim()) ? "#c8bfaa" : C.purple,
+          color: "#fff", fontSize: 14, fontWeight: 700, fontFamily: "Georgia,serif",
+          marginTop: 4, boxShadow: (fillingAll || !primaryRef.trim()) ? "none" : "0 3px 10px rgba(0,0,0,.2)" }
+      }, fillingAll ? "✨ Filling all AI blocks…" : !primaryRef.trim() ? "Enter a scripture reference first" : "✨ Fill all AI blocks")
+  );
+}
+
+
+// A semester-aware variant of TimeBar (the shipped TimeBar defaults total=45).
+function LessonTimeBar({ used, total, semLabel }) {
+  const pct = Math.min(100, Math.round((used / Math.max(1, total)) * 100));
+  const over = used > total;
+  const color = over ? C.red : used >= total * 0.85 ? "#c8a030" : C.green;
+  return React.createElement("div", null,
+    React.createElement("div", {
+      style: { display: "flex", justifyContent: "space-between", fontSize: 12, marginBottom: 5 }
+    },
+      React.createElement("span", { style: { color: C.muted, fontWeight: 600 } }, "Lesson body (excl. gathering)"),
+      React.createElement("span", { style: { fontWeight: 700, color } }, used + " / " + total + " min " + (over ? "⚠️" : ""))
+    ),
+    React.createElement("div", { style: { height: 9, background: "#e8dfc8", borderRadius: 99, overflow: "hidden" } },
+      React.createElement("div", { style: { height: "100%", width: pct + "%", background: color, borderRadius: 99, transition: "width .35s" } })
+    ),
+    semLabel && React.createElement("div", {
+      style: { fontSize: 10, color: C.muted, marginTop: 5, fontStyle: "italic" }
+    }, "Ceiling from: " + semLabel)
+  );
+}
+
+
 function LessonPrepApp() {
   const [tab, setTab] = useState("setup");
   const [pacing, setPacing] = useState(null);
@@ -2833,6 +3284,7 @@ function LessonPrepApp() {
   const [syncedContent, setSyncedContent] = useState(null);
   const [syncedSelected, setSyncedSelected] = useState([]);
   const [savedLessons, setSavedLessons] = useState([]);
+  const [semester, setSemester] = useState(DEFAULT_SEMESTER);
   useEffect(() => {
     loadStorage("seminary_pacing_v3").then(p => {
       if (p) { setPacing(p); setTab("today"); }
@@ -2840,10 +3292,17 @@ function LessonPrepApp() {
     loadStorage("seminary_lessons_v1").then(ls => {
       if (ls && Array.isArray(ls)) setSavedLessons(ls);
     });
+    loadSemester().then(setSemester);
   }, []);
   const savePacing = useCallback(p => {
     setPacing(p);
     saveStorage("seminary_pacing_v3", p);
+  }, []);
+  const saveSemesterLocal = useCallback(async s => {
+    setSemester(s); await saveSemester(s);
+  }, []);
+  const resetSemesterLocal = useCallback(async () => {
+    await resetSemesterToDefault(); setSemester({ ...DEFAULT_SEMESTER });
   }, []);
   const saveLesson = useCallback((content, ref) => {
     if (!content || !content.title) return;
@@ -2924,7 +3383,10 @@ function LessonPrepApp() {
     }
   }, tab === "setup" && /*#__PURE__*/React.createElement(SetupTab, {
     pacing: pacing,
-    onSave: savePacing
+    onSave: savePacing,
+    semester: semester,
+    onSaveSemester: saveSemesterLocal,
+    onResetSemester: resetSemesterLocal
   }), tab === "today" && /*#__PURE__*/React.createElement(TodayTab, {
     pacing: pacing,
     savedLessons: savedLessons,
@@ -2933,7 +3395,8 @@ function LessonPrepApp() {
   }), tab === "build" && /*#__PURE__*/React.createElement(BuildTab, {
     initialLesson: buildLesson,
     onSave: saveLesson,
-    onSync: onSync
+    onSync: onSync,
+    semester: semester
   }), tab === "slides" && /*#__PURE__*/React.createElement(SlidesTab, {
     content: syncedContent,
     selected: syncedSelected
