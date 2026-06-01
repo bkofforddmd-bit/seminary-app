@@ -2682,15 +2682,16 @@ function buildGlueInSlipsHTML(quote, lessonRef) {
   const len = (quote.text || "").length
     + (quote.source || "").length + (quote.scriptureRef || "").length;
 
-  // HARD CAP: every slip is at most 3.5in wide x 4in tall so it fits inside
-  // a set of scriptures. The BOX never grows — instead the font scales DOWN
-  // as the quote gets longer, so even a long quote stays within the cap.
+  // SIZE RULES: width is fixed at 3.5in (two per row on a letter page).
+  // Height SHRINKS to fit the content (just a small padding border) and is
+  // only CAPPED at 4in — it never pads out to 4in. Font scales down as the
+  // quote gets longer so even a long quote stays within the 4in cap.
   let qFont, srcFont, pad, lh;
-  if (len <= 110)      { qFont = 13;   srcFont = 11; pad = 12; lh = 1.45; }
-  else if (len <= 200) { qFont = 12;   srcFont = 10.5; pad = 11; lh = 1.4; }
-  else if (len <= 320) { qFont = 10.5; srcFont = 9.5; pad = 10; lh = 1.35; }
-  else if (len <= 480) { qFont = 9;    srcFont = 8.5; pad = 9;  lh = 1.3; }
-  else                 { qFont = 7.5;  srcFont = 7;   pad = 8;  lh = 1.25; }
+  if (len <= 110)      { qFont = 13;   srcFont = 11; pad = 9;  lh = 1.4; }
+  else if (len <= 200) { qFont = 12;   srcFont = 10.5; pad = 9; lh = 1.38; }
+  else if (len <= 320) { qFont = 10.5; srcFont = 9.5; pad = 8; lh = 1.34; }
+  else if (len <= 480) { qFont = 9;    srcFont = 8.5; pad = 8;  lh = 1.3; }
+  else                 { qFont = 7.5;  srcFont = 7;   pad = 7;  lh = 1.25; }
 
   const esc = s => String(s || "")
     .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -2703,9 +2704,10 @@ function buildGlueInSlipsHTML(quote, lessonRef) {
       (quote.origin ? `<div class="origin">${esc(quote.origin)}</div>` : "") +
     `</div>`;
 
-  // A letter page printable area is ~7.5in wide; two 3.5in slips fit per row.
-  // 24 copies fills roughly two pages — ample for a class, browser paginates.
-  const copies = 24;
+  // Slips now shrink to content, so many more fit per page for short quotes.
+  // Generate enough to fill ~3 pages of the densest layout; the browser
+  // paginates and only prints the pages that have slips.
+  const copies = 48;
   let cells = "";
   for (let i = 0; i < copies; i++) cells += slip;
 
@@ -2716,11 +2718,11 @@ function buildGlueInSlipsHTML(quote, lessonRef) {
     `h1{font-size:14px;color:#2c1a0e;margin-bottom:3px}` +
     `.note{font-size:11px;color:#7a6040;margin-bottom:14px}` +
     `.grid{display:flex;flex-wrap:wrap;gap:0;align-content:flex-start}` +
-    // hard dimensional cap — width AND height clamped, content clipped if it
-    // somehow overflows so a slip can never exceed the scripture-safe size.
-    `.slip{width:3.5in;max-width:3.5in;height:4in;max-height:4in;overflow:hidden;` +
+    // width fixed at 3.5in; height shrink-wraps content but is CAPPED at 4in.
+    // overflow:hidden is a final backstop so a slip can never exceed the cap.
+    `.slip{width:3.5in;max-width:3.5in;max-height:4in;overflow:hidden;` +
       `border:1px dashed #999;padding:${pad}px;break-inside:avoid;page-break-inside:avoid;` +
-      `display:flex;flex-direction:column;gap:5px;justify-content:center}` +
+      `display:flex;flex-direction:column;gap:4px;justify-content:flex-start}` +
     `.slip .ref{font-size:9px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:#92662a}` +
     `.slip .quote{font-size:${qFont}px;line-height:${lh};color:#1a1008}` +
     `.slip .src{font-size:${srcFont}px;font-style:italic;color:#5a3800}` +
@@ -2729,7 +2731,7 @@ function buildGlueInSlipsHTML(quote, lessonRef) {
       `.slip{border:1px dashed #bbb}@page{margin:.4in;size:letter}}` +
     `</style></head><body>` +
     `<h1>Glue-in slips: ${esc(quote.scriptureRef || lessonRef || "")}</h1>` +
-    `<div class="note">Print, then cut along the dashed lines (each slip is sized to fit inside scriptures: max 3.5&Prime; &times; 4&Prime;). Students glue each slip beside the scripture reference. Use your browser's Print &rarr; Save as PDF.</div>` +
+    `<div class="note">Print, then cut along the dashed lines (each slip fits inside scriptures: max 3.5&Prime; &times; 4&Prime;). Students glue each slip beside the scripture reference. Use your browser's Print &rarr; Save as PDF.</div>` +
     `<div class="grid">${cells}</div>` +
     `</body></html>`;
 }
