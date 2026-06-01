@@ -706,10 +706,15 @@ OFFICIAL LESSON GUIDE (from uploaded PDF):
 Stay true to this official guide in your lesson plan.`;
   }
 
-  const resp = await fetch("/.netlify/functions/claude-proxy", {
+  const resp = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ apiKey: key,
+    headers: {
+      "Content-Type": "application/json",
+      "x-api-key": key,
+      "anthropic-version": "2023-06-01",
+      "anthropic-dangerous-allow-cors": "true"
+    },
+    body: JSON.stringify({
       model: "claude-sonnet-4-6",
       max_tokens: 6000,
       system: "You are a Seminary teacher preparation assistant for The Church of Jesus Christ of Latter-day Saints with deep knowledge of the official seminary teacher manuals, General Conference talks, and scripture. Generate accurate, doctrinally sound, engaging lesson content for high school students.",
