@@ -699,9 +699,7 @@ async function generateLesson(lessonRef, combined, officialPdfB64) {
       system: "You are a Seminary teacher preparation assistant for The Church of Jesus Christ of Latter-day Saints with deep knowledge of the official seminary teacher manuals, General Conference talks, and scripture. Generate accurate, doctrinally sound, engaging lesson content for high school students.",
       messages: [{
         role: "user",
-        content: `${pdfContext}Lesson plan JSON for seminary: "${lessonRef}"${comboNote}. Return ONLY minified JSON:
-{"title":"","objective":"","overview":"","teacherNote":"","modernSummary":"","keyVerses":[{"reference":"","kjvText":"","modern":"","insight":""}],"prompts":[{"text":"","format":"class","duration":3,"deepen":""}],"activities":[{"name":"","steps":"","duration":5,"tag":"activity","purpose":""}],"quotes":[{"text":"","source":"","year":""}],"media":[{"title":"","search":"","duration":3,"kind":"video"}],"imagePrompts":[{"for":"","prompt":""}],"closingThought":""}
-Give 3 keyVerses, 3 prompts, 2 activities, 2 quotes, 1 media, 2 imagePrompts.`
+        content: (pdfContext || "") + "Generate a seminary lesson plan for: " + lessonRef + (comboNote || "") + ". Return valid JSON with fields: title, objective, overview, teacherNote, modernSummary, keyVerses (array with reference/kjvText/modern/insight), prompts (array with text/format/duration/deepen), activities (array with name/steps/duration/tag/purpose), quotes (array with text/source/year), media (array with title/search/duration/kind), imagePrompts (array with for/prompt), closingThought. Provide 3 keyVerses, 3 prompts, 2 activities, 2 quotes, 1 media, 2 imagePrompts."
       }]
     })
   });
