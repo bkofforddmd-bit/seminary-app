@@ -1037,17 +1037,15 @@ function SetupTab({
     try {
       const parsed = await importPacingFile(file);
       // Merge parsed data, keeping any existing manual entries
-      // Fix days array if AI used 0=Mon instead of JS standard 0=Sun
-      let parsedDays = (parsed.days || [1,2,3,4]).map(Number);
-      const needsDateShift = parsedDays.includes(0) && !parsedDays.includes(6);
-      if (needsDateShift) {
-        parsedDays = parsedDays.map(d => d + 1);
-      }
+      // Force days to never include Sunday (0) — seminary doesn't meet Sundays
+      let parsedDays = (parsed.days || [1,2,3,4]).map(Number).filter(d => d !== 0);
+      if (parsedDays.length === 0) parsedDays = [1,2,3,4];
       const scheduleRows = (parsed.schedule || []).map((s, i) => ({
         date: (() => {
-          if (!needsDateShift || !s.date) return s.date;
+          if (!s.date) return s.date;
           const d = new Date(s.date + 'T12:00:00');
-          d.setDate(d.getDate() + 1);
+          if (d.getDay() === 0) d.setDate(d.getDate() + 1); // shift Sunday → Monday
+          if (d.getDay() === 6) d.setDate(d.getDate() + 2); // shift Saturday → Monday
           return d.toISOString().split('T')[0];
         })(),
         n: i + 1,
