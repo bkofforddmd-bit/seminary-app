@@ -660,11 +660,15 @@ async function importPacingFile(file) {
 // ── AI LESSON GENERATOR ────────────────────────────────────────────
 async function extractPdfSummary(pdfB64, lessonRef, apiKey) {
   // Step 1: Use Haiku to quickly extract key lesson elements from PDF
-  const resp = await fetch("/.netlify/functions/claude-proxy", {
+  const resp = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      "x-api-key": apiKey,
+      "anthropic-version": "2023-06-01",
+      "anthropic-dangerous-allow-cors": "true"
+    },
     body: JSON.stringify({
-      apiKey,
       model: "claude-haiku-4-5-20251001",
       max_tokens: 1500,
       messages: [{
