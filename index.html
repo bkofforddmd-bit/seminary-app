@@ -1037,9 +1037,14 @@ function SetupTab({
     try {
       const parsed = await importPacingFile(file);
       // Merge parsed data, keeping any existing manual entries
-      // Force days to never include Sunday (0) — seminary doesn't meet Sundays
-      let parsedDays = (parsed.days || [1,2,3,4]).map(Number).filter(d => d !== 0);
-      if (parsedDays.length === 0) parsedDays = [1,2,3,4];
+      // Fix AI day indexing: if days contains 0 but not 6,
+      // AI used 0=Mon (0-indexed) — shift all values up by 1 to match JS (0=Sun)
+      let parsedDays = (parsed.days || [1,2,3,4,5]).map(Number);
+      if (parsedDays.includes(0) && !parsedDays.includes(6)) {
+        parsedDays = parsedDays.map(d => d + 1); // 0→1(Mon), 1→2(Tue)...4→5(Fri)
+      }
+      parsedDays = parsedDays.filter(d => d >= 1 && d <= 5); // never Sun or Sat
+      if (parsedDays.length === 0) parsedDays = [1,2,3,4,5];
       const scheduleRows = (parsed.schedule || []).map((s, i) => ({
         date: s.date,
         n: i + 1,
@@ -1064,6 +1069,22 @@ function SetupTab({
         _cur.setDate(_cur.getDate() + 1);
       }
       while (_ri < scheduleRows.length) reated.push(scheduleRows[_ri++]);
+      // Deduplicate: if two rows share a date, push second to next available class day
+      const _seen = new Map();
+      const _classdays = [];
+      { let _dd = new Date(_startD); 
+        while(_dd <= new Date(_endD.getTime() + 30*24*60*60*1000)) {
+          if(_days.includes(_dd.getDay())) _classdays.push(_dd.toISOString().split('T')[0]);
+          _dd.setDate(_dd.getDate()+1);
+        }
+      }
+      let _cdIdx = 0;
+      reated.forEach(row => {
+        while(_seen.has(_classdays[_cdIdx])) _cdIdx++;
+        row.date = _classdays[_cdIdx] || row.date;
+        _seen.set(_classdays[_cdIdx], true);
+        _cdIdx++;
+      });
       const updated = {
         course: parsed.course || form.course,
         book: parsed.book || form.book,
