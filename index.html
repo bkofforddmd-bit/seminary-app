@@ -560,9 +560,9 @@ async function saveStorage(key, val) {
 }
 
 // ── PACING GUIDE IMPORTER (PDF, Excel, CSV, Google Sheets export) ──
-const EXTRACT_PROMPT = `Extract the seminary schedule from this pacing guide. Return ONLY valid JSON, no markdown. Format:
-{"course":"","book":"Book of Mormon","start":"YYYY-MM-DD","end":"YYYY-MM-DD","days":[1,2,3,4],"schedule":[{"date":"YYYY-MM-DD","lessonNum":"","title":"","ref":"","type":"scripture","skip":false}]}
-Types: scripture|doctrinal-mastery|assess|holiday|workday. Set skip:true for no-school days. Include every row.`;
+const EXTRACT_PROMPT = `Extract the seminary schedule from this pacing guide. Return ONLY minified JSON (no spaces, no line breaks, no markdown). Use this exact structure:
+{"course":"","book":"","start":"YYYY-MM-DD","end":"YYYY-MM-DD","days":[1,2,3,4],"schedule":[{"date":"YYYY-MM-DD","lessonNum":"","title":"","ref":"","type":"scripture","skip":false}]}
+Types: scripture|doctrinal-mastery|assess|holiday|workday. skip:true for no-school days. Include every single row. Be as brief as possible in title strings.`;
 async function callExtractAPI(messages) {
   var _data$content;
   const key = getApiKey();
@@ -574,7 +574,8 @@ async function callExtractAPI(messages) {
     body: JSON.stringify({
       apiKey: key,
       model: "claude-haiku-4-5-20251001",
-      max_tokens: 2000,
+      max_tokens: 4096,
+      system: "You output only compact minified JSON. No spaces after colons or commas unless inside string values. No line breaks.",
       messages
     })
   });
