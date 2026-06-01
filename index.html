@@ -611,7 +611,25 @@ async function callExtractAPI(messages) {
   const data = await resp.json();
   const raw = ((_data$content = data.content) === null || _data$content === void 0 || (_data$content = _data$content.find(b => b.type === "text")) === null || _data$content === void 0 ? void 0 : _data$content.text) || "{}";
   const clean = raw.replace(/^```json?\s*/i, "").replace(/```\s*$/, "").trim();
-  return JSON.parse(clean);
+  try {
+    return JSON.parse(clean);
+  } catch(e) {
+    // JSON truncated - find last complete top-level field and close the object
+    let fixed = clean;
+    // Remove trailing incomplete field by finding last complete },
+    // Find last safely-ended position (after a closing brace/bracket)
+    let cutAt = -1;
+    for (let i = fixed.length - 1; i > 100; i--) {
+      if (fixed[i] === '}' || fixed[i] === ']') { cutAt = i + 1; break; }
+    }
+    if (cutAt > 100) fixed = fixed.slice(0, cutAt);
+    // Recount and close
+    let opens = 0, objOpens = 0;
+    for (const c of fixed) { if(c==="[") opens++; else if(c==="]") opens--; else if(c==="{") objOpens++; else if(c==="}") objOpens--; }
+    for (let i = 0; i < opens; i++) fixed += ']';
+    for (let i = 0; i < objOpens; i++) fixed += '}';
+    try { return JSON.parse(fixed); } catch(e2) { return { title: "Moses 1:1-11", objective: "Generated content was truncated. Please try again.", overview: "", prompts: [], activities: [], quotes: [], keyVerses: [], media: [], imagePrompts: [], closingThought: "" }; }
+  }
 }
 async function importPacingFile(file) {
   const name = file.name.toLowerCase();
@@ -695,7 +713,7 @@ async function generateLesson(lessonRef, combined, officialPdfB64) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ apiKey: key,
       model: officialPdfB64 ? "claude-sonnet-4-6" : "claude-haiku-4-5-20251001",
-      max_tokens: officialPdfB64 ? 2000 : 1500,
+      max_tokens: officialPdfB64 ? 4000 : 3000,
       system: "You are a Seminary teacher preparation assistant for The Church of Jesus Christ of Latter-day Saints with deep knowledge of the official seminary teacher manuals, General Conference talks, and scripture. Generate accurate, doctrinally sound, engaging lesson content for high school students.",
       messages: [{
         role: "user",
@@ -714,7 +732,25 @@ async function generateLesson(lessonRef, combined, officialPdfB64) {
   const data = await resp.json();
   const raw = ((_data$content2 = data.content) === null || _data$content2 === void 0 || (_data$content2 = _data$content2.find(b => b.type === "text")) === null || _data$content2 === void 0 ? void 0 : _data$content2.text) || "{}";
   const clean = raw.replace(/^```json?\s*/i, "").replace(/```\s*$/, "").trim();
-  return JSON.parse(clean);
+  try {
+    return JSON.parse(clean);
+  } catch(e) {
+    // JSON truncated - find last complete top-level field and close the object
+    let fixed = clean;
+    // Remove trailing incomplete field by finding last complete },
+    // Find last safely-ended position (after a closing brace/bracket)
+    let cutAt = -1;
+    for (let i = fixed.length - 1; i > 100; i--) {
+      if (fixed[i] === '}' || fixed[i] === ']') { cutAt = i + 1; break; }
+    }
+    if (cutAt > 100) fixed = fixed.slice(0, cutAt);
+    // Recount and close
+    let opens = 0, objOpens = 0;
+    for (const c of fixed) { if(c==="[") opens++; else if(c==="]") opens--; else if(c==="{") objOpens++; else if(c==="}") objOpens--; }
+    for (let i = 0; i < opens; i++) fixed += ']';
+    for (let i = 0; i < objOpens; i++) fixed += '}';
+    try { return JSON.parse(fixed); } catch(e2) { return { title: "Moses 1:1-11", objective: "Generated content was truncated. Please try again.", overview: "", prompts: [], activities: [], quotes: [], keyVerses: [], media: [], imagePrompts: [], closingThought: "" }; }
+  }
 }
 
 // ── SHARED UI ──────────────────────────────────────────────────────
