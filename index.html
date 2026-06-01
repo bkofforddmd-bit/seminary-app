@@ -658,7 +658,7 @@ async function importPacingFile(file) {
 }
 
 // ── AI LESSON GENERATOR ────────────────────────────────────────────
-async function generateLesson(lessonRef, combined) {
+async function generateLesson(lessonRef, combined, officialPdfB64) {
   var _data$content2;
   const comboNote = combined ? ` (combined with: ${combined})` : "";
   const key = getApiKey();
@@ -672,7 +672,76 @@ async function generateLesson(lessonRef, combined) {
       system: "You are a Seminary teacher preparation assistant for The Church of Jesus Christ of Latter-day Saints with deep knowledge of the official seminary teacher manuals, General Conference talks, and scripture. Generate accurate, doctrinally sound, engaging lesson content for high school students.",
       messages: [{
         role: "user",
-        content: `Generate a complete lesson plan for: "${lessonRef}"${comboNote}
+        content: officialPdfB64 ? [
+          { type: "document", source: { type: "base64", media_type: "application/pdf", data: officialPdfB64 } },
+          { type: "text", text: `The PDF above is the official Church Seminary lesson. Use it as your PRIMARY source — follow its learning objectives, scriptures, activities, and doctrinal emphasis. Build the lesson plan around what is actually in this PDF.\n\nGenerate a complete lesson plan for: "${lessonRef}"${comboNote}
+
+Return ONLY valid JSON — no markdown, no backticks. Start with { end with }.
+
+{
+  "title": "Engaging 6-9 word lesson title",
+  "objective": "By the end of class, students will [specific outcome]",
+  "overview": "2-3 sentence overview of doctrinal theme and lesson focus",
+  "teacherNote": "One practical tip for the teacher (1-2 sentences)",
+  "modernSummary": "Exactly 200 words. Vivid modern-language narrative of the scripture passage for teenagers. Present tense, relatable, feel alive not academic.",
+  "keyVerses": [
+    {
+      "reference": "Book Chapter:Verse",
+      "kjvText": "Complete exact KJV text",
+      "modern": "1-2 sentence natural modern paraphrase for teens",
+      "insight": "One key doctrinal insight (1 sentence)",
+      "crossRefs": ["Related scripture 1","Related scripture 2","Related scripture 3"],
+      "talkTopics": ["Youth talk topic 1","Youth talk topic 2"],
+      "manualNote": "What the seminary teacher manual emphasizes (1 sentence)"
+    }
+  ],
+  "prompts": [
+    {
+      "text": "Full discussion question",
+      "format": "class|pair|journal|think",
+      "duration": 3,
+      "deepen": "Follow-up question",
+      "tip": "Facilitation tip for teacher"
+    }
+  ],
+  "activities": [
+    {
+      "name": "Activity name",
+      "steps": "Step-by-step instructions",
+      "duration": 6,
+      "materials": "Specific materials, or None",
+      "tag": "game|object-lesson|role-play|activity",
+      "purpose": "What gospel principle this teaches"
+    }
+  ],
+  "quotes": [
+    {
+      "text": "Quote text, 40-60 words",
+      "source": "Full name, calling",
+      "year": "Year if known",
+      "topic": "Doctrinal principle this supports"
+    }
+  ],
+  "media": [
+    {
+      "title": "Exact resource title",
+      "description": "What it shows and why it helps",
+      "search": "Exact Gospel Library search phrase",
+      "duration": 4,
+      "kind": "video|image|music"
+    }
+  ],
+  "imagePrompts": [
+    {
+      "for": "What slide this image is for",
+      "prompt": "Detailed AI image prompt: style, subject, mood, lighting. LDS-appropriate."
+    }
+  ],
+  "closingThought": "2-3 sentence closing thought or invitation to act"
+}
+
+Provide: 5 keyVerses, 5 prompts (vary formats), 3 activities (varied tags), 4 quotes from apostles/prophets, 3 media, 5 imagePrompts.` }
+        ] : `Generate a complete lesson plan for: "${lessonRef}"${comboNote}
 
 Return ONLY valid JSON — no markdown, no backticks. Start with { end with }.
 
@@ -955,8 +1024,8 @@ function TabBar({
     label: "Setup"
   }, {
     id: "today",
-    icon: "📖",
-    label: "Today"
+    icon: "📋",
+    label: "Lessons Planned"
   }, {
     id: "build",
     icon: "✨",
@@ -1604,320 +1673,129 @@ function SetupTab({
 // ── TODAY TAB ──────────────────────────────────────────────────────
 function TodayTab({
   pacing,
+  savedLessons,
+  deleteLesson,
   onGoToBuild
 }) {
-  var _pacing$schedule;
+  const [viewing, setViewing] = useState(null);
   const today = todayISO();
-  if (!pacing || !((_pacing$schedule = pacing.schedule) !== null && _pacing$schedule !== void 0 && _pacing$schedule.length)) {
-    return /*#__PURE__*/React.createElement("div", {
-      style: {
-        padding: 32,
-        textAlign: "center"
-      }
-    }, /*#__PURE__*/React.createElement("div", {
-      style: {
-        fontSize: 40,
-        marginBottom: 12
-      }
-    }, "\uD83D\uDCC5"), /*#__PURE__*/React.createElement("div", {
-      style: {
-        fontFamily: "Georgia,serif",
-        fontWeight: 700,
-        fontSize: 16,
-        color: C.brown,
-        marginBottom: 8
-      }
-    }, "No schedule yet"), /*#__PURE__*/React.createElement("div", {
-      style: {
-        fontSize: 13,
-        color: C.muted
-      }
-    }, "Import your pacing guide or set up your semester in the Setup tab."));
+  const todayLesson = pacing && pacing.schedule ? pacing.schedule.find(s => s.date === today && !s.skip) : null;
+
+  if (viewing) {
+    // Show full saved lesson detail
+    const lesson = viewing.content;
+    return /*#__PURE__*/React.createElement("div", { style: { padding: "12px 14px", maxWidth: 620, margin: "0 auto" } },
+      /*#__PURE__*/React.createElement("button", {
+        onClick: () => setViewing(null),
+        style: { marginBottom: 12, background: "transparent", border: "none", color: C.gold,
+          fontFamily: "Georgia,serif", fontSize: 13, cursor: "pointer", padding: 0 }
+      }, "← Back to Lessons Planned"),
+      /*#__PURE__*/React.createElement(Card, { style: { marginBottom: 10, background: "#fdf9f4", border: `1.5px solid ${C.gold}` } },
+        /*#__PURE__*/React.createElement("div", { style: { fontFamily: "Georgia,serif", fontWeight: 700, fontSize: 17, color: C.brown, marginBottom: 4 } }, lesson.title),
+        /*#__PURE__*/React.createElement("div", { style: { fontSize: 12, color: C.muted } }, viewing.ref)
+      ),
+      lesson.overview && /*#__PURE__*/React.createElement(Card, { style: { marginBottom: 10 } },
+        /*#__PURE__*/React.createElement("div", { style: { fontWeight: 700, fontSize: 13, color: C.brown, marginBottom: 5 } }, "Overview"),
+        /*#__PURE__*/React.createElement("div", { style: { fontSize: 13, color: C.text, lineHeight: 1.6 } }, lesson.overview)
+      ),
+      lesson.objective && /*#__PURE__*/React.createElement(Card, { style: { marginBottom: 10 } },
+        /*#__PURE__*/React.createElement("div", { style: { fontWeight: 700, fontSize: 13, color: C.brown, marginBottom: 5 } }, "Objective"),
+        /*#__PURE__*/React.createElement("div", { style: { fontSize: 13, color: C.text, lineHeight: 1.6 } }, lesson.objective)
+      ),
+      lesson.keyVerses && lesson.keyVerses.length > 0 && /*#__PURE__*/React.createElement(Card, { style: { marginBottom: 10 } },
+        /*#__PURE__*/React.createElement("div", { style: { fontWeight: 700, fontSize: 13, color: C.brown, marginBottom: 8 } }, "Key Scriptures"),
+        lesson.keyVerses.map((v, i) => /*#__PURE__*/React.createElement("div", { key: i, style: { marginBottom: 10, paddingBottom: 10, borderBottom: i < lesson.keyVerses.length-1 ? `1px solid ${C.border}` : "none" } },
+          /*#__PURE__*/React.createElement("div", { style: { fontWeight: 700, fontSize: 12, color: C.gold, marginBottom: 3 } }, v.reference),
+          /*#__PURE__*/React.createElement("div", { style: { fontSize: 12, color: C.text, fontStyle: "italic", lineHeight: 1.5, marginBottom: 3 } }, v.kjvText),
+          v.insight && /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: C.muted } }, "💡 ", v.insight)
+        ))
+      ),
+      lesson.prompts && lesson.prompts.length > 0 && /*#__PURE__*/React.createElement(Card, { style: { marginBottom: 10 } },
+        /*#__PURE__*/React.createElement("div", { style: { fontWeight: 700, fontSize: 13, color: C.brown, marginBottom: 8 } }, "Discussion Questions"),
+        lesson.prompts.map((p, i) => /*#__PURE__*/React.createElement("div", { key: i, style: { marginBottom: 8, paddingBottom: 8, borderBottom: i < lesson.prompts.length-1 ? `1px solid ${C.border}` : "none" } },
+          /*#__PURE__*/React.createElement("div", { style: { fontSize: 12, color: C.text, lineHeight: 1.5, marginBottom: 2 } }, p.text),
+          /*#__PURE__*/React.createElement("div", { style: { fontSize: 10, color: C.muted } }, p.format, " · ", p.duration, " min")
+        ))
+      ),
+      lesson.activities && lesson.activities.length > 0 && /*#__PURE__*/React.createElement(Card, { style: { marginBottom: 10 } },
+        /*#__PURE__*/React.createElement("div", { style: { fontWeight: 700, fontSize: 13, color: C.brown, marginBottom: 8 } }, "Activities"),
+        lesson.activities.map((a, i) => /*#__PURE__*/React.createElement("div", { key: i, style: { marginBottom: 8, paddingBottom: 8, borderBottom: i < lesson.activities.length-1 ? `1px solid ${C.border}` : "none" } },
+          /*#__PURE__*/React.createElement("div", { style: { fontWeight: 700, fontSize: 12, color: C.brown, marginBottom: 3 } }, a.name, " (", a.duration, " min)"),
+          /*#__PURE__*/React.createElement("div", { style: { fontSize: 12, color: C.text, lineHeight: 1.5 } }, a.steps)
+        ))
+      ),
+      lesson.quotes && lesson.quotes.length > 0 && /*#__PURE__*/React.createElement(Card, { style: { marginBottom: 10 } },
+        /*#__PURE__*/React.createElement("div", { style: { fontWeight: 700, fontSize: 13, color: C.brown, marginBottom: 8 } }, "Quotes"),
+        lesson.quotes.map((q, i) => /*#__PURE__*/React.createElement("div", { key: i, style: { marginBottom: 8, paddingBottom: 8, borderBottom: i < lesson.quotes.length-1 ? `1px solid ${C.border}` : "none" } },
+          /*#__PURE__*/React.createElement("div", { style: { fontSize: 12, color: C.text, fontStyle: "italic", lineHeight: 1.5, marginBottom: 2 } }, '"', q.text, '"'),
+          /*#__PURE__*/React.createElement("div", { style: { fontSize: 10, color: C.muted } }, "— ", q.source, q.year ? " (" + q.year + ")" : "")
+        ))
+      ),
+      lesson.closingThought && /*#__PURE__*/React.createElement(Card, { style: { marginBottom: 10 } },
+        /*#__PURE__*/React.createElement("div", { style: { fontWeight: 700, fontSize: 13, color: C.brown, marginBottom: 5 } }, "Closing Thought"),
+        /*#__PURE__*/React.createElement("div", { style: { fontSize: 13, color: C.text, lineHeight: 1.6, fontStyle: "italic" } }, lesson.closingThought)
+      )
+    );
   }
-  const sched = pacing.schedule;
-  const todayRow = sched.find(s => s.date === today);
-  const teachingDays = sched.filter(s => !s.skip);
-  const pastTeaching = teachingDays.filter(s => s.date < today).length;
-  const total = teachingDays.length;
-  const pct = Math.round(pastTeaching / total * 100);
-  const upcoming = teachingDays.filter(s => s.date > today).slice(0, 3);
-  const nextDM = teachingDays.find(s => s.date >= today && s.type === "doctrinal-mastery");
-  const nextAssess = teachingDays.find(s => s.date >= today && s.type === "assess");
-  return /*#__PURE__*/React.createElement("div", {
-    style: {
-      padding: "16px 14px 44px",
-      maxWidth: 560,
-      margin: "0 auto"
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      marginBottom: 14
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 12,
-      color: C.muted
-    }
-  }, new Date().toLocaleDateString("en-US", {
-    weekday: "long",
-    month: "long",
-    day: "numeric",
-    year: "numeric"
-  })), /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontFamily: "Georgia,serif",
-      fontWeight: 700,
-      fontSize: 20,
-      color: C.brown
-    }
-  }, pacing.course || pacing.book), /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 12,
-      color: C.muted
-    }
-  }, pacing.book, " \xB7 Freshman & Sophomore")), /*#__PURE__*/React.createElement(Card, {
-    style: {
-      marginBottom: 12
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: "flex",
-      justifyContent: "space-between",
-      marginBottom: 6
-    }
-  }, /*#__PURE__*/React.createElement("span", {
-    style: {
-      fontSize: 12,
-      color: C.muted,
-      fontWeight: 600
-    }
-  }, "Semester Progress"), /*#__PURE__*/React.createElement("span", {
-    style: {
-      fontSize: 12,
-      fontWeight: 700,
-      color: C.brown
-    }
-  }, pastTeaching, " of ", total, " lessons")), /*#__PURE__*/React.createElement("div", {
-    style: {
-      height: 10,
-      background: "#e8dfc8",
-      borderRadius: 99,
-      overflow: "hidden"
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      height: "100%",
-      width: `${pct}%`,
-      background: C.gold,
-      borderRadius: 99
-    }
-  })), /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 11,
-      color: C.muted,
-      marginTop: 5
-    }
-  }, total - pastTeaching, " lessons remaining")), todayRow && !todayRow.skip ? /*#__PURE__*/React.createElement(Card, {
-    style: {
-      marginBottom: 12,
-      border: `2px solid ${C.gold}`,
-      background: "#fdf9f0"
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: "flex",
-      justifyContent: "space-between",
-      alignItems: "flex-start"
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      flex: 1
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: "flex",
-      gap: 7,
-      alignItems: "center",
-      marginBottom: 5
-    }
-  }, /*#__PURE__*/React.createElement("span", {
-    style: {
-      fontSize: 11,
-      color: C.gold,
-      fontWeight: 700,
-      letterSpacing: ".08em",
-      textTransform: "uppercase"
-    }
-  }, "Today \u2014 Lesson ", todayRow.n), /*#__PURE__*/React.createElement(TypeBadge, {
-    type: todayRow.type || "scripture"
-  })), /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontFamily: "Georgia,serif",
-      fontWeight: 700,
-      fontSize: 18,
-      color: C.brown,
-      marginBottom: 3
-    }
-  }, todayRow.title || "(no title — edit in Setup)"), todayRow.lessonNum && /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 11,
-      color: C.muted
-    }
-  }, todayRow.lessonNum)), /*#__PURE__*/React.createElement("span", {
-    style: {
-      fontSize: 32,
-      marginLeft: 8
-    }
-  }, "\uD83D\uDCD6")), /*#__PURE__*/React.createElement("button", {
-    onClick: () => onGoToBuild(todayRow),
-    style: {
-      width: "100%",
-      marginTop: 12,
-      padding: "11px",
-      border: "none",
-      borderRadius: 8,
-      cursor: "pointer",
-      background: C.brown,
-      color: C.cream,
-      fontSize: 14,
-      fontWeight: 700,
-      fontFamily: "Georgia,serif",
-      boxShadow: "0 2px 8px rgba(0,0,0,.18)"
-    }
-  }, "\u2728 Prep This Lesson \u2014 Let's Go")) : /*#__PURE__*/React.createElement(Card, {
-    style: {
-      marginBottom: 12,
-      textAlign: "center",
-      padding: "24px 16px"
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 36,
-      marginBottom: 8
-    }
-  }, todayRow !== null && todayRow !== void 0 && todayRow.skip ? "🏖" : "📅"), /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontFamily: "Georgia,serif",
-      fontWeight: 700,
-      fontSize: 16,
-      color: C.brown
-    }
-  }, todayRow ? todayRow.title : "No class today")), nextDM && /*#__PURE__*/React.createElement(Card, {
-    style: {
-      marginBottom: 9,
-      border: "1.5px solid #82b89a",
-      background: "#eef7f1",
-      padding: "9px 13px"
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 11,
-      fontWeight: 700,
-      color: C.green,
-      marginBottom: 2
-    }
-  }, "\uD83C\uDFAF Next Doctrinal Mastery"), /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 12.5,
-      fontWeight: 600,
-      color: C.text
-    }
-  }, nextDM.title), /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 11,
-      color: C.muted
-    }
-  }, formatDate(nextDM.date))), nextAssess && /*#__PURE__*/React.createElement(Card, {
-    style: {
-      marginBottom: 9,
-      border: "1.5px solid #f8b4b4",
-      background: "#fef2f2",
-      padding: "9px 13px"
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 11,
-      fontWeight: 700,
-      color: C.red,
-      marginBottom: 2
-    }
-  }, "\u26A0 Next Assess Your Learning"), /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 12.5,
-      fontWeight: 600,
-      color: C.text
-    }
-  }, nextAssess.title), /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 11,
-      color: C.muted
-    }
-  }, formatDate(nextAssess.date), " \xB7 Required for credit")), upcoming.length > 0 && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 12,
-      fontWeight: 700,
-      color: C.muted,
-      textTransform: "uppercase",
-      letterSpacing: ".08em",
-      marginBottom: 8
-    }
-  }, "Coming Up"), /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: "flex",
-      flexDirection: "column",
-      gap: 7
-    }
-  }, upcoming.map(s => /*#__PURE__*/React.createElement(Card, {
-    key: s.date,
-    style: {
-      display: "flex",
-      justifyContent: "space-between",
-      alignItems: "center",
-      padding: "10px 13px"
-    }
-  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: "flex",
-      gap: 6,
-      alignItems: "center",
-      marginBottom: 3
-    }
-  }, /*#__PURE__*/React.createElement("span", {
-    style: {
-      fontSize: 11,
-      color: C.muted
-    }
-  }, formatDate(s.date), " \xB7 Lesson ", s.n), /*#__PURE__*/React.createElement(TypeBadge, {
-    type: s.type || "scripture"
-  })), /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontFamily: "Georgia,serif",
-      fontWeight: 600,
-      fontSize: 13,
-      color: C.brown
-    }
-  }, s.title || "(no title)")), /*#__PURE__*/React.createElement("button", {
-    onClick: () => onGoToBuild(s),
-    style: {
-      padding: "5px 10px",
-      border: `1.5px solid ${C.border}`,
-      borderRadius: 7,
-      cursor: "pointer",
-      background: "transparent",
-      fontSize: 11,
-      color: C.brown,
-      fontWeight: 700,
-      fontFamily: "Georgia,serif",
-      whiteSpace: "nowrap",
-      marginLeft: 8
-    }
-  }, "Prep"))))));
+
+  return /*#__PURE__*/React.createElement("div", { style: { padding: "12px 14px", maxWidth: 620, margin: "0 auto" } },
+    // Today's lesson banner if there is one
+    todayLesson && /*#__PURE__*/React.createElement(Card, {
+      style: { marginBottom: 12, background: "#eef7f1", border: "1.5px solid #82b89a" }
+    },
+      /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: "#2a6644", fontWeight: 700, marginBottom: 3 } }, "📅 TODAY — " + today),
+      /*#__PURE__*/React.createElement("div", { style: { fontFamily: "Georgia,serif", fontWeight: 700, fontSize: 14, color: C.brown, marginBottom: 6 } }, todayLesson.title || todayLesson.lesson || ""),
+      /*#__PURE__*/React.createElement("button", {
+        onClick: () => onGoToBuild && onGoToBuild(todayLesson),
+        style: { padding: "6px 14px", background: C.gold, border: "none", borderRadius: 7,
+          fontSize: 12, fontWeight: 700, color: C.brown, fontFamily: "Georgia,serif", cursor: "pointer" }
+      }, "Prepare This Lesson →")
+    ),
+    // Saved lessons list
+    /*#__PURE__*/React.createElement("div", { style: { fontFamily: "Georgia,serif", fontWeight: 700, fontSize: 16, color: C.brown, marginBottom: 10 } },
+      "📋 Lessons Planned (", (savedLessons || []).length, ")"
+    ),
+    (!savedLessons || savedLessons.length === 0) ? /*#__PURE__*/React.createElement("div", {
+      style: { textAlign: "center", padding: "32px 16px", color: C.muted, fontSize: 13 }
+    },
+      /*#__PURE__*/React.createElement("div", { style: { fontSize: 40, marginBottom: 12 } }, "✨"),
+      "No lessons saved yet.",
+      /*#__PURE__*/React.createElement("br", null),
+      "Go to Build, generate a lesson, and tap Save."
+    ) : savedLessons.map((entry, i) => /*#__PURE__*/React.createElement(Card, {
+      key: i,
+      style: { marginBottom: 9, cursor: "pointer" },
+      onClick: () => setViewing(entry)
+    },
+      /*#__PURE__*/React.createElement("div", { style: { display: "flex", alignItems: "flex-start", gap: 8 } },
+        /*#__PURE__*/React.createElement("div", { style: { flex: 1 } },
+          /*#__PURE__*/React.createElement("div", { style: { fontFamily: "Georgia,serif", fontWeight: 700, fontSize: 14, color: C.brown, marginBottom: 2 } }, entry.title),
+          /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: C.muted } }, entry.ref),
+          /*#__PURE__*/React.createElement("div", { style: { fontSize: 10, color: C.muted, marginTop: 2 } }, "Saved ", new Date(entry.savedAt).toLocaleDateString())
+        ),
+        /*#__PURE__*/React.createElement("div", { style: { display: "flex", gap: 6, flexShrink: 0 } },
+          /*#__PURE__*/React.createElement("button", {
+            onClick: e => { e.stopPropagation(); onGoToBuild && onGoToBuild(entry); },
+            style: { padding: "5px 10px", background: C.cream, border: `1px solid ${C.border}`,
+              borderRadius: 6, fontSize: 11, color: C.brown, fontFamily: "Georgia,serif", cursor: "pointer" }
+          }, "Edit"),
+          /*#__PURE__*/React.createElement("button", {
+            onClick: e => { e.stopPropagation(); deleteLesson && deleteLesson(entry.ref); },
+            style: { padding: "5px 10px", background: "#fef2f2", border: "1px solid #f8b4b4",
+              borderRadius: 6, fontSize: 11, color: C.red, fontFamily: "Georgia,serif", cursor: "pointer" }
+          }, "Delete")
+        )
+      )
+    ))
+  );
 }
+
 
 // ── BUILD TAB ──────────────────────────────────────────────────────
 function BuildTab({
   initialLesson,
-  onSync
+  onSync,
+  onSave
 }) {
   var _content$keyVerses2, _content$prompts2, _content$activities2, _content$quotes2, _content$media2, _content$imagePrompts;
   const [ref, setRef] = useState("");
@@ -1926,6 +1804,8 @@ function BuildTab({
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState(null);
   const [content, setContent] = useState(null);
+  const [officialPdf, setOfficialPdf] = useState(null); // base64 of official lesson PDF
+  const [officialPdfName, setOfficialPdfName] = useState("");
   const [selected, setSelected] = useState([]);
   const [expandedVerse, setExpandedVerse] = useState(null);
   const [expandedAct, setExpandedAct] = useState(null);
@@ -1943,7 +1823,7 @@ function BuildTab({
     setSelected([]);
     try {
       var _result$keyVerses, _result$prompts, _result$activities, _result$quotes;
-      const result = await generateLesson(ref.trim(), isCombined ? combined.trim() : null);
+      const result = await generateLesson(ref.trim(), isCombined ? combined.trim() : null, officialPdf);
       setContent(result);
       const defaults = [];
       (_result$keyVerses = result.keyVerses) === null || _result$keyVerses === void 0 || _result$keyVerses.forEach((_, i) => defaults.push(`v${i}`));
@@ -2043,7 +1923,48 @@ function BuildTab({
       border: `1.5px solid ${C.border}`,
       fontFamily: "Georgia,serif"
     }
-  })), /*#__PURE__*/React.createElement("button", {
+  })), /*#__PURE__*/React.createElement("div", {
+    style: { marginBottom: 12 }
+  },
+    /*#__PURE__*/React.createElement("div", {
+      style: { fontSize: 12, fontWeight: 700, color: C.brown, marginBottom: 5 }
+    }, "📄 Official Lesson PDF (optional)"),
+    /*#__PURE__*/React.createElement("div", {
+      style: { fontSize: 11, color: C.muted, marginBottom: 7, lineHeight: 1.5 }
+    }, "Upload the official Church Seminary lesson PDF to keep the AI grounded in approved content."),
+    officialPdfName ? /*#__PURE__*/React.createElement("div", {
+      style: { display: "flex", alignItems: "center", gap: 8, padding: "7px 10px",
+        background: "#eef7f1", border: "1.5px solid #82b89a", borderRadius: 8, marginBottom: 6 }
+    },
+      /*#__PURE__*/React.createElement("span", { style: { fontSize: 12, color: "#2a6644", flex: 1 } },
+        "✓ ", officialPdfName),
+      /*#__PURE__*/React.createElement("button", {
+        onClick: () => { setOfficialPdf(null); setOfficialPdfName(""); },
+        style: { background: "none", border: "none", color: C.muted, cursor: "pointer", fontSize: 13, padding: "0 4px" }
+      }, "✕")
+    ) : /*#__PURE__*/React.createElement("label", {
+      style: { display: "block", padding: "8px 12px", border: "1.5px dashed #c8a450",
+        borderRadius: 8, cursor: "pointer", textAlign: "center", fontSize: 12, color: C.muted,
+        background: C.cream }
+    },
+      "📎 Tap to upload lesson PDF",
+      /*#__PURE__*/React.createElement("input", {
+        type: "file", accept: ".pdf", style: { display: "none" },
+        onChange: async e => {
+          const f = e.target.files[0]; if (!f) return;
+          const b64 = await new Promise((res, rej) => {
+            const r = new FileReader();
+            r.onload = () => res(r.result.split(",")[1]);
+            r.onerror = () => rej(new Error("Read failed"));
+            r.readAsDataURL(f);
+          });
+          setOfficialPdf(b64); setOfficialPdfName(f.name);
+          e.target.value = "";
+        }
+      })
+    )
+  ),
+/*#__PURE__*/React.createElement("button", {
     onClick: generate,
     disabled: loading || !ref.trim() || !getApiKey(),
     style: {
@@ -2070,7 +1991,20 @@ function BuildTab({
       color: C.red,
       marginBottom: 12
     }
-  }, err), content && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement(Card, {
+  }, err), content && /*#__PURE__*/React.createElement("div", null,
+  /*#__PURE__*/React.createElement("div", { style: { display:"flex", gap:8, marginBottom:10, alignItems:"center" } },
+    /*#__PURE__*/React.createElement("button", {
+      onClick: () => { onSync && onSync(content, selected); onSave && onSave(content, ref); },
+      style: { flex:1, padding:"9px 14px", background:"#2a6644", color:"#fff", border:"none",
+        borderRadius:8, fontSize:13, fontWeight:700, fontFamily:"Georgia,serif", cursor:"pointer" }
+    }, "💾 Save Lesson"),
+    /*#__PURE__*/React.createElement("button", {
+      onClick: () => { setContent(null); setRef(""); setOfficialPdf(null); setOfficialPdfName(""); },
+      style: { padding:"9px 14px", background:"transparent", border:"1.5px solid #c8b890",
+        borderRadius:8, fontSize:12, color:"#7a6040", fontFamily:"Georgia,serif", cursor:"pointer" }
+    }, "New Lesson")
+  ),
+  /*#__PURE__*/React.createElement(Card, {
     style: {
       marginBottom: 11
     }
@@ -2982,12 +2916,13 @@ function LessonPrepApp() {
   const [buildLesson, setBuildLesson] = useState(null);
   const [syncedContent, setSyncedContent] = useState(null);
   const [syncedSelected, setSyncedSelected] = useState([]);
+  const [savedLessons, setSavedLessons] = useState([]);
   useEffect(() => {
     loadStorage("seminary_pacing_v3").then(p => {
-      if (p) {
-        setPacing(p);
-        setTab("today");
-      }
+      if (p) { setPacing(p); setTab("today"); }
+    });
+    loadStorage("seminary_lessons_v1").then(ls => {
+      if (ls && Array.isArray(ls)) setSavedLessons(ls);
     });
   }, []);
   const savePacing = useCallback(p => {
@@ -2997,6 +2932,22 @@ function LessonPrepApp() {
   const goToBuild = useCallback(lesson => {
     setBuildLesson(lesson);
     setTab("build");
+  }, []);
+  const saveLesson = useCallback((content, ref) => {
+    if (!content || !content.title) return;
+    setSavedLessons(prev => {
+      const entry = { ref: ref || content.title, title: content.title, savedAt: new Date().toISOString(), content };
+      const updated = [entry, ...prev.filter(l => l.ref !== entry.ref)];
+      saveStorage("seminary_lessons_v1", updated);
+      return updated;
+    });
+  }, []);
+  const deleteLesson = useCallback(ref => {
+    setSavedLessons(prev => {
+      const updated = prev.filter(l => l.ref !== ref);
+      saveStorage("seminary_lessons_v1", updated);
+      return updated;
+    });
   }, []);
   const onSync = useCallback((content, selected) => {
     setSyncedContent(content);
@@ -3060,9 +3011,12 @@ function LessonPrepApp() {
     onSave: savePacing
   }), tab === "today" && /*#__PURE__*/React.createElement(TodayTab, {
     pacing: pacing,
+    savedLessons: savedLessons,
+    deleteLesson: deleteLesson,
     onGoToBuild: goToBuild
   }), tab === "build" && /*#__PURE__*/React.createElement(BuildTab, {
     initialLesson: buildLesson,
+    onSave: saveLesson,
     onSync: onSync
   }), tab === "slides" && /*#__PURE__*/React.createElement(SlidesTab, {
     content: syncedContent,
