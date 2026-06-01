@@ -690,29 +690,18 @@ async function generateLesson(lessonRef, combined, officialPdfB64) {
     ? "\n\nIMPORTANT: The teacher has uploaded the official Church Seminary lesson PDF. Follow its learning objectives, activities, and doctrinal emphasis closely."
     : "";
 
-  const resp = await fetch("/.netlify/functions/claude-proxy", {
+  const resp = await fetch("/.netlify/functions/claude-lesson", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ apiKey: key,
       model: "claude-haiku-4-5-20251001",
-      max_tokens: 3000,
+      max_tokens: 1500,
       system: "You are a Seminary teacher preparation assistant for The Church of Jesus Christ of Latter-day Saints with deep knowledge of the official seminary teacher manuals, General Conference talks, and scripture. Generate accurate, doctrinally sound, engaging lesson content for high school students.",
       messages: [{
         role: "user",
-        content: `${pdfContext}Generate a lesson plan for: "${lessonRef}"${comboNote}
-
-Return ONLY valid JSON. No markdown. Start with { end with }.
-
-{"title":"","objective":"","overview":"","teacherNote":"","modernSummary":"100-word modern narrative for teens",
-"keyVerses":[{"reference":"","kjvText":"","modern":"","insight":"","crossRefs":[],"talkTopics":[],"manualNote":""}],
-"prompts":[{"text":"","format":"class|pair|journal|think","duration":3,"deepen":"","tip":""}],
-"activities":[{"name":"","steps":"","duration":6,"materials":"","tag":"game|object-lesson|role-play|activity","purpose":""}],
-"quotes":[{"text":"40-60 word quote","source":"Name, calling","year":"","topic":""}],
-"media":[{"title":"","description":"","search":"","duration":4,"kind":"video|image|music"}],
-"imagePrompts":[{"for":"","prompt":"LDS-appropriate AI image prompt"}],
-"closingThought":""}
-
-Provide: 4 keyVerses, 4 prompts, 2 activities, 3 quotes, 2 media, 3 imagePrompts.`
+        content: `${pdfContext}Lesson plan JSON for seminary: "${lessonRef}"${comboNote}. Return ONLY minified JSON:
+{"title":"","objective":"","overview":"","teacherNote":"","modernSummary":"","keyVerses":[{"reference":"","kjvText":"","modern":"","insight":""}],"prompts":[{"text":"","format":"class","duration":3,"deepen":""}],"activities":[{"name":"","steps":"","duration":5,"tag":"activity","purpose":""}],"quotes":[{"text":"","source":"","year":""}],"media":[{"title":"","search":"","duration":3,"kind":"video"}],"imagePrompts":[{"for":"","prompt":""}],"closingThought":""}
+Give 3 keyVerses, 3 prompts, 2 activities, 2 quotes, 1 media, 2 imagePrompts.`
       }]
     })
   });

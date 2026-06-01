@@ -1,5 +1,19 @@
-// Netlify Function: claude-proxy.js
+// Netlify Background Function: netlify/functions/claude-proxy.js
+// Background functions have a 15-minute timeout instead of 30 seconds
+
 exports.handler = async (event) => {
+  if (event.httpMethod === "OPTIONS") {
+    return {
+      statusCode: 200,
+      headers: {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Headers": "Content-Type",
+        "Access-Control-Allow-Methods": "POST, OPTIONS"
+      },
+      body: ""
+    };
+  }
+
   if (event.httpMethod !== "POST") {
     return { statusCode: 405, body: "Method Not Allowed" };
   }
@@ -8,7 +22,7 @@ exports.handler = async (event) => {
   try {
     body = JSON.parse(event.body);
   } catch (e) {
-    return { statusCode: 400, body: JSON.stringify({ error: "Invalid JSON: " + e.message }) };
+    return { statusCode: 400, body: JSON.stringify({ error: "Invalid JSON" }) };
   }
 
   const { apiKey, ...anthropicBody } = body;
@@ -31,10 +45,16 @@ exports.handler = async (event) => {
     const data = await response.json();
     return {
       statusCode: response.status,
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        "Access-Control-Allow-Origin": "*"
+      },
       body: JSON.stringify(data)
     };
   } catch (e) {
-    return { statusCode: 500, body: JSON.stringify({ error: "Proxy fetch error: " + e.message }) };
+    return {
+      statusCode: 500,
+      body: JSON.stringify({ error: "Proxy error: " + e.message })
+    };
   }
 };

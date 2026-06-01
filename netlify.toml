@@ -6,9 +6,7 @@
   node_bundler = "esbuild"
 
 [functions."claude-proxy"]
-  timeout = 30
+  timeout = 26
 
-[[headers]]
-  for = "/.netlify/functions/*"
-  [headers.values]
-    Access-Control-Allow-Origin = "*"
+[functions."claude-lesson"]  
+  timeout = 26
