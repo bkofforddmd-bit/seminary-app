@@ -668,7 +668,7 @@ async function generateLesson(lessonRef, combined, officialPdfB64) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ apiKey: key, 
       model: "claude-sonnet-4-6",
-      max_tokens: 4000,
+      max_tokens: 6000,
       system: "You are a Seminary teacher preparation assistant for The Church of Jesus Christ of Latter-day Saints with deep knowledge of the official seminary teacher manuals, General Conference talks, and scripture. Generate accurate, doctrinally sound, engaging lesson content for high school students.",
       messages: [{
         role: "user",
@@ -1832,7 +1832,7 @@ function BuildTab({
       (_result$quotes = result.quotes) === null || _result$quotes === void 0 || _result$quotes.slice(0, 2).forEach((_, i) => defaults.push(`q${i}`));
       setSelected(defaults);
     } catch (e) {
-      setErr("Generation failed. Check connection and try again.");
+      setErr("Generation failed: " + (e && e.message ? e.message : String(e)));
       console.error(e);
     }
     setLoading(false);

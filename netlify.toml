@@ -7,3 +7,8 @@
 
 [functions."claude-proxy"]
   timeout = 30
+
+[[headers]]
+  for = "/.netlify/functions/*"
+  [headers.values]
+    Access-Control-Allow-Origin = "*"
