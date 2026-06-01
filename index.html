@@ -1041,13 +1041,7 @@ function SetupTab({
       let parsedDays = (parsed.days || [1,2,3,4]).map(Number).filter(d => d !== 0);
       if (parsedDays.length === 0) parsedDays = [1,2,3,4];
       const scheduleRows = (parsed.schedule || []).map((s, i) => ({
-        date: (() => {
-          if (!s.date) return s.date;
-          const d = new Date(s.date + 'T12:00:00');
-          if (d.getDay() === 0) d.setDate(d.getDate() + 1); // shift Sunday → Monday
-          if (d.getDay() === 6) d.setDate(d.getDate() + 2); // shift Saturday → Monday
-          return d.toISOString().split('T')[0];
-        })(),
+        date: s.date,
         n: i + 1,
         title: s.title || "",
         ref: s.ref || "",
@@ -1055,13 +1049,28 @@ function SetupTab({
         type: s.type || "scripture",
         skip: !!s.skip
       }));
+      // Regenerate dates from scratch using start date + days array
+      // This avoids trusting AI-generated dates which are often off by one
+      const _startD = new Date((parsed.start || form.start) + 'T12:00:00');
+      const _endD   = new Date((parsed.end   || form.end  ) + 'T12:00:00');
+      const _days   = [...parsedDays].sort((a,b)=>a-b);
+      const reated  = [];
+      let _cur = new Date(_startD), _ri = 0;
+      while (_cur <= _endD && _ri < scheduleRows.length) {
+        if (_days.includes(_cur.getDay())) {
+          reated.push({ ...scheduleRows[_ri], date: _cur.toISOString().split('T')[0] });
+          _ri++;
+        }
+        _cur.setDate(_cur.getDate() + 1);
+      }
+      while (_ri < scheduleRows.length) reated.push(scheduleRows[_ri++]);
       const updated = {
         course: parsed.course || form.course,
         book: parsed.book || form.book,
         start: parsed.start || form.start,
         end: parsed.end || form.end,
-        days: parsedDays || form.days,
-        schedule: scheduleRows
+        days: _days,
+        schedule: reated
       };
       setForm(updated);
       onSave(updated);
