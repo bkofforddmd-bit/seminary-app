@@ -1037,8 +1037,19 @@ function SetupTab({
     try {
       const parsed = await importPacingFile(file);
       // Merge parsed data, keeping any existing manual entries
+      // Fix days array if AI used 0=Mon instead of JS standard 0=Sun
+      let parsedDays = (parsed.days || [1,2,3,4]).map(Number);
+      const needsDateShift = parsedDays.includes(0) && !parsedDays.includes(6);
+      if (needsDateShift) {
+        parsedDays = parsedDays.map(d => d + 1);
+      }
       const scheduleRows = (parsed.schedule || []).map((s, i) => ({
-        date: s.date,
+        date: (() => {
+          if (!needsDateShift || !s.date) return s.date;
+          const d = new Date(s.date + 'T12:00:00');
+          d.setDate(d.getDate() + 1);
+          return d.toISOString().split('T')[0];
+        })(),
         n: i + 1,
         title: s.title || "",
         ref: s.ref || "",
@@ -1051,7 +1062,7 @@ function SetupTab({
         book: parsed.book || form.book,
         start: parsed.start || form.start,
         end: parsed.end || form.end,
-        days: parsed.days || form.days,
+        days: parsedDays || form.days,
         schedule: scheduleRows
       };
       setForm(updated);
