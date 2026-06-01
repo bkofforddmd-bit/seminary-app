@@ -1830,6 +1830,11 @@ function buildSlides(content, selected) {
       else if (s.instructions) lines.push(s.instructions);
       if (s.ai && s.ai.steps && s.ai.steps.length) lines.push(s.ai.steps.map(x => "• " + x).join("\n"));
       if (s.ai && s.ai.prompts && s.ai.prompts.length) lines.push(s.ai.prompts.map(x => "❓ " + x).join("\n"));
+      if (s.ai && s.ai.media && s.ai.media.length) lines.push(s.ai.media.map(x => "🎬 " + x.title + "\n" + x.url).join("\n\n"));
+      if (s.ai && s.ai.quotes && s.ai.quotes.length) {
+        const q = s.ai.quotes[0];
+        lines.push("\u201C" + q.text + "\u201D\n\u2014 " + q.source + (q.scriptureRef ? "  (" + q.scriptureRef + ")" : ""));
+      }
       fslides.push({
         type: "section", bg: C.white, tc: C.brown, cc: C.text,
         title: (s.icon ? s.icon + " " : "") + s.name + (s.minutes ? "  (" + s.minutes + " min)" : ""),
@@ -2373,6 +2378,14 @@ const SEGMENT_TYPES = [
     desc: "Hands-on study-journal work: glue-ins, marking passages, cross-referencing.",
   },
   {
+    id: "glue_in_quote",
+    name: "Glue-in Quote (printable slips)",
+    icon: "🖨️",
+    defaultMinutes: 5,
+    fill: "ai",
+    desc: "AI suggests 2-3 prophet/apostle quotes tied to the passage; pick one and print cut-out slips for students to glue into their scriptures.",
+  },
+  {
     id: "video",
     name: "Video",
     icon: "🎬",
@@ -2633,6 +2646,117 @@ function repairJSON(raw, fallback) {
 //    { teach: string, steps: [string], prompts: [string], minutesHint: n }
 //  Static segments never reach here — caller short-circuits on fill==="static".
 // ───────────────────────────────────────────────────────────────────
+// Build a search URL for a referenced video/song. Official Church media →
+// the Gospel Library media search (most reliable for Bible Videos, Book of
+// Mormon Videos, Conference talks); everything else → YouTube search.
+// A search link never dies the way a guessed direct URL would.
+function mediaSearchUrl(title, source) {
+  const q = encodeURIComponent(title || "");
+  if (source === "official") {
+    return "https://www.churchofjesuschrist.org/search?lang=eng&type=media&query=" + q;
+  }
+  return "https://www.youtube.com/results?search_query=" + q;
+}
+
+// Build a Gospel Library verification link for a quote. The AI can't reliably
+// emit an exact talk URL, so instead we search Gospel Library for the talk
+// title + speaker — that lands the teacher on the official source to confirm
+// wording, and never 404s the way a guessed direct URL would.
+function quoteSourceUrl(quote) {
+  // Strip a leading title word (President/Elder/Sister/Bishop...) so the
+  // speaker name matches Gospel Library's indexing more cleanly.
+  const speaker = (quote.source || "")
+    .split(",")[0]
+    .replace(/^(President|Elder|Sister|Brother|Bishop|Apostle|Prophet)\s+/i, "")
+    .trim();
+  const parts = [quote.origin, speaker].filter(Boolean).join(" ");
+  const q = encodeURIComponent(parts || quote.source || quote.text || "");
+  return "https://www.churchofjesuschrist.org/study/general-conference?lang=eng&query=" + q;
+}
+
+// Generate a print-ready page of cut-out glue-in slips for one quote.
+// Slip size auto-scales to quote length so short quotes tile densely and
+// long quotes get more room. Uses the same open/print/download fallback
+// chain as the rest of the app. Returns false only if all attempts fail.
+function buildGlueInSlipsHTML(quote, lessonRef) {
+  const len = (quote.text || "").length
+    + (quote.source || "").length + (quote.scriptureRef || "").length;
+
+  // HARD CAP: every slip is at most 3.5in wide x 4in tall so it fits inside
+  // a set of scriptures. The BOX never grows — instead the font scales DOWN
+  // as the quote gets longer, so even a long quote stays within the cap.
+  let qFont, srcFont, pad, lh;
+  if (len <= 110)      { qFont = 13;   srcFont = 11; pad = 12; lh = 1.45; }
+  else if (len <= 200) { qFont = 12;   srcFont = 10.5; pad = 11; lh = 1.4; }
+  else if (len <= 320) { qFont = 10.5; srcFont = 9.5; pad = 10; lh = 1.35; }
+  else if (len <= 480) { qFont = 9;    srcFont = 8.5; pad = 9;  lh = 1.3; }
+  else                 { qFont = 7.5;  srcFont = 7;   pad = 8;  lh = 1.25; }
+
+  const esc = s => String(s || "")
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+  const slip =
+    `<div class="slip">` +
+      (quote.scriptureRef ? `<div class="ref">${esc(quote.scriptureRef)}</div>` : "") +
+      `<div class="quote">&ldquo;${esc(quote.text)}&rdquo;</div>` +
+      `<div class="src">&mdash; ${esc(quote.source)}</div>` +
+      (quote.origin ? `<div class="origin">${esc(quote.origin)}</div>` : "") +
+    `</div>`;
+
+  // A letter page printable area is ~7.5in wide; two 3.5in slips fit per row.
+  // 24 copies fills roughly two pages — ample for a class, browser paginates.
+  const copies = 24;
+  let cells = "";
+  for (let i = 0; i < copies; i++) cells += slip;
+
+  return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"/>` +
+    `<title>Glue-in Slips — ${esc(quote.scriptureRef || lessonRef || "")}</title><style>` +
+    `*{box-sizing:border-box;margin:0;padding:0}` +
+    `body{font-family:Georgia,'Times New Roman',serif;color:#1a1008;background:#f0ece4;padding:.4in}` +
+    `h1{font-size:14px;color:#2c1a0e;margin-bottom:3px}` +
+    `.note{font-size:11px;color:#7a6040;margin-bottom:14px}` +
+    `.grid{display:flex;flex-wrap:wrap;gap:0;align-content:flex-start}` +
+    // hard dimensional cap — width AND height clamped, content clipped if it
+    // somehow overflows so a slip can never exceed the scripture-safe size.
+    `.slip{width:3.5in;max-width:3.5in;height:4in;max-height:4in;overflow:hidden;` +
+      `border:1px dashed #999;padding:${pad}px;break-inside:avoid;page-break-inside:avoid;` +
+      `display:flex;flex-direction:column;gap:5px;justify-content:center}` +
+    `.slip .ref{font-size:9px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:#92662a}` +
+    `.slip .quote{font-size:${qFont}px;line-height:${lh};color:#1a1008}` +
+    `.slip .src{font-size:${srcFont}px;font-style:italic;color:#5a3800}` +
+    `.slip .origin{font-size:8px;color:#9a8060;line-height:1.25}` +
+    `@media print{body{background:white;padding:0}.note,h1{display:none}` +
+      `.slip{border:1px dashed #bbb}@page{margin:.4in;size:letter}}` +
+    `</style></head><body>` +
+    `<h1>Glue-in slips: ${esc(quote.scriptureRef || lessonRef || "")}</h1>` +
+    `<div class="note">Print, then cut along the dashed lines (each slip is sized to fit inside scriptures: max 3.5&Prime; &times; 4&Prime;). Students glue each slip beside the scripture reference. Use your browser's Print &rarr; Save as PDF.</div>` +
+    `<div class="grid">${cells}</div>` +
+    `</body></html>`;
+}
+
+function printGlueInSlips(quote, lessonRef) {
+  const html = buildGlueInSlipsHTML(quote, lessonRef);
+  // Attempt 1: open in a new tab
+  try {
+    const blob = new Blob([html], { type: "text/html" });
+    const url = URL.createObjectURL(blob);
+    const w = window.open(url, "_blank");
+    if (w) { setTimeout(() => URL.revokeObjectURL(url), 5000); return true; }
+    URL.revokeObjectURL(url);
+  } catch (e) {}
+  // Attempt 2: download the HTML file
+  try {
+    const blob = new Blob([html], { type: "text/html" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = "glue-in-slips.html";
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 2000);
+    return true;
+  } catch (e) {}
+  return false;
+}
+
 async function generateSegmentFill(seg, lessonRef, opts) {
   const o = opts || {};
   const combinedRefs = o.combinedRefs || [];      // Phase 4: extra passages
@@ -2652,8 +2776,18 @@ async function generateSegmentFill(seg, lessonRef, opts) {
     ? "Use the official Seminary lesson PDF above as your PRIMARY source — follow its objectives, activities, and doctrinal emphasis. "
     : "";
 
-  const task =
-    pdfPrimer +
+  const isGlueQuote = seg.id === "glue_in_quote";
+
+  const task = isGlueQuote ?
+    (pdfPrimer +
+    `For a Seminary lesson on ${refLine}, suggest 2-3 short, powerful quotes from modern prophets, apostles, or General Authorities of The Church of Jesus Christ of Latter-day Saints that directly illuminate this passage. Prefer General Conference addresses. Each quote should be 1-3 sentences — short enough to glue into the margin of a student's scriptures.\n\n` +
+    `Return ONLY valid JSON, no markdown/backticks/preamble:\n` +
+    `{"teach":"one sentence on how to use these glue-in quotes in class",` +
+    `"quotes":[{"text":"the exact quote","source":"Full Name, Title (e.g. 'Russell M. Nelson, President of the Church')","origin":"talk title and conference/date, e.g. 'The Power of Spiritual Momentum, Apr 2022 General Conference'","scriptureRef":"the specific verse this pairs with, e.g. '2 Nephi 2:25'"}],` +
+    `"minutesHint":${seg.minutes}}\n` +
+    `Provide 2-3 quotes. Use ACCURATE, real, verifiable quotes and attributions — do not invent or paraphrase quotes. If unsure of an exact wording, choose a quote you are confident is accurate.`)
+    :
+    (pdfPrimer +
     `Generate content for ONLY this part of the lesson on ${refLine}:\n` +
     `SEGMENT: "${seg.name}" — ${seg.desc || seg.instructions || ""}\n` +
     `Target length: about ${seg.minutes} minutes of class time.` +
@@ -2662,7 +2796,9 @@ async function generateSegmentFill(seg, lessonRef, opts) {
     `{"teach":"the main content for this segment as finished prose (2-5 sentences for short blocks, more for study/discussion blocks)",` +
     `"steps":["concrete things the teacher does, in order — empty array if not applicable"],` +
     `"prompts":["discussion or reflection questions for students — empty array if not applicable"],` +
-    `"minutesHint":${seg.minutes}}`;
+    `"media":[{"title":"exact title of any video/song you reference","source":"official" if it is a Church of Jesus Christ video (Bible Videos, Book of Mormon Videos, Mormon Messages, General Conference) otherwise "youtube"}],` +
+    `"minutesHint":${seg.minutes}}` +
+    `\nIMPORTANT: Only include a media item if you actually reference a specific video or song in the teach text. Use the real, exact title so it can be searched. Empty array if none.`);
 
   const userContent = officialPdfB64
     ? [
@@ -2690,12 +2826,27 @@ async function generateSegmentFill(seg, lessonRef, opts) {
   const data = await resp.json();
   const textBlock = data.content && data.content.find(b => b.type === "text");
   const raw = (textBlock && textBlock.text) || "{}";
-  const filled = repairJSON(raw, { teach: "Content generation was truncated. Tap regenerate.", steps: [], prompts: [], minutesHint: seg.minutes });
+  const filled = repairJSON(raw, { teach: "Content generation was truncated. Tap regenerate.", steps: [], prompts: [], media: [], minutesHint: seg.minutes });
   // normalize
   return {
     teach: filled.teach || "",
     steps: Array.isArray(filled.steps) ? filled.steps : [],
     prompts: Array.isArray(filled.prompts) ? filled.prompts : [],
+    media: (Array.isArray(filled.media) ? filled.media : [])
+      .filter(m => m && m.title)
+      .map(m => ({
+        title: m.title,
+        source: m.source === "official" ? "official" : "youtube",
+        url: mediaSearchUrl(m.title, m.source === "official" ? "official" : "youtube")
+      })),
+    quotes: (Array.isArray(filled.quotes) ? filled.quotes : [])
+      .filter(q => q && q.text)
+      .map(q => ({
+        text: q.text,
+        source: q.source || "",
+        origin: q.origin || "",
+        scriptureRef: q.scriptureRef || ""
+      })),
     minutesHint: filled.minutesHint || seg.minutes
   };
 }
@@ -2902,11 +3053,16 @@ function SegmentMenu({ onAdd }) {
 //  (Phase 3) its AI-fill output with a regenerate button. Static blocks
 //  render baked instructions; custom blocks expose name + instruction fields.
 // ───────────────────────────────────────────────────────────────────
-function SkeletonRow({ row, index, total, fill, fillState, onMove, onRemove, onMinutes, onCustom, onFill }) {
+function SkeletonRow({ row, index, total, fill, fillState, lessonRef, onMove, onRemove, onMinutes, onCustom, onFill }) {
   const seg = segmentById(row.typeId);
+  const [pickedQuote, setPickedQuote] = React.useState(0);
+  const [manualText, setManualText] = React.useState("");
+  const [manualSource, setManualSource] = React.useState("");
+  const [manualRef, setManualRef] = React.useState("");
   if (!seg) return null;
   const isAI = seg.fill === "ai";
   const isCustom = seg.id === "custom";
+  const isGlueQuote = seg.id === "glue_in_quote";
   const st = fillState || {};   // { loading, error, data }
 
   return React.createElement(Card, { style: { marginBottom: 9, padding: "10px 12px" } },
@@ -2965,6 +3121,56 @@ function SkeletonRow({ row, index, total, fill, fillState, onMove, onRemove, onM
         st.data.prompts && st.data.prompts.length > 0 && React.createElement("div", null,
           React.createElement("div", { style: { fontSize: 10.5, fontWeight: 700, color: C.blue, marginBottom: 2 } }, "ASK"),
           st.data.prompts.map((p, i) => React.createElement("div", { key: i, style: { marginBottom: 2 } }, "❓ " + p))
+        ),
+        st.data.media && st.data.media.length > 0 && React.createElement("div", { style: { marginTop: 6 } },
+          React.createElement("div", { style: { fontSize: 10.5, fontWeight: 700, color: C.green, marginBottom: 3 } }, "WATCH / LISTEN"),
+          st.data.media.map((m, i) => React.createElement("a", {
+            key: i, href: m.url, target: "_blank", rel: "noopener noreferrer",
+            style: { display: "flex", alignItems: "center", gap: 6, marginBottom: 4,
+              fontSize: 12, color: C.green, textDecoration: "none", fontWeight: 700 }
+          },
+            React.createElement("span", null, "🎬"),
+            React.createElement("span", { style: { textDecoration: "underline" } }, m.title),
+            React.createElement("span", {
+              style: { fontSize: 10, fontWeight: 400, color: C.muted }
+            }, m.source === "official" ? "↗ Gospel Library" : "↗ YouTube")
+          ))
+        ),
+        isGlueQuote && st.data.quotes && st.data.quotes.length > 0 && React.createElement("div", { style: { marginTop: 4 } },
+          React.createElement("div", { style: { fontSize: 10.5, fontWeight: 700, color: "#92662a", marginBottom: 4 } },
+            "PICK A QUOTE TO PRINT"),
+          st.data.quotes.map((q, i) => React.createElement("div", {
+            key: i,
+            onClick: () => setPickedQuote(i),
+            style: {
+              border: `1.5px solid ${pickedQuote === i ? C.gold : C.border}`,
+              background: pickedQuote === i ? "rgba(200,164,80,.15)" : "#fff",
+              borderRadius: 8, padding: "8px 10px", marginBottom: 6, cursor: "pointer"
+            }
+          },
+            q.scriptureRef && React.createElement("div", {
+              style: { fontSize: 9.5, fontWeight: 700, letterSpacing: ".04em", textTransform: "uppercase", color: "#92662a", marginBottom: 3 }
+            }, q.scriptureRef),
+            React.createElement("div", { style: { fontSize: 12, lineHeight: 1.45, color: C.text, fontStyle: "italic" } },
+              "\u201C" + q.text + "\u201D"),
+            React.createElement("div", { style: { fontSize: 11, color: "#5a3800", marginTop: 3 } }, "\u2014 " + q.source),
+            q.origin && React.createElement("div", { style: { fontSize: 9.5, color: C.muted, marginTop: 2 } }, q.origin),
+            React.createElement("a", {
+              href: quoteSourceUrl(q), target: "_blank", rel: "noopener noreferrer",
+              onClick: e => e.stopPropagation(),
+              style: { display: "inline-flex", alignItems: "center", gap: 4, marginTop: 5,
+                fontSize: 10.5, color: C.blue, textDecoration: "underline", fontWeight: 700 }
+            }, "\uD83D\uDD0D Verify source in Gospel Library \u2197")
+          )),
+          React.createElement("button", {
+            onClick: () => {
+              const q = st.data.quotes[pickedQuote];
+              if (q) printGlueInSlips(q, lessonRef || "");
+            },
+            style: { width: "100%", marginTop: 2, padding: "9px", borderRadius: 8, cursor: "pointer",
+              border: "none", background: "#92662a", color: "#fff", fontFamily: "Georgia,serif",
+              fontSize: 12.5, fontWeight: 700 }
+          }, "\uD83D\uDDA8\uFE0F Print glue-in slips for the selected quote")
         )
       ),
       React.createElement("button", {
@@ -2974,6 +3180,52 @@ function SkeletonRow({ row, index, total, fill, fillState, onMove, onRemove, onM
           border: `1.5px solid ${C.purple}`, background: st.loading ? "#efe6fa" : "#f3eefb",
           color: C.purple, fontFamily: "Georgia,serif", fontWeight: 700 }
       }, st.loading ? "✨ Filling…" : (st.data ? "↻ Regenerate this block" : "✨ Fill with AI"))
+    ),
+
+    // ── Manual glue-in quote entry (glue_in_quote only) ──
+    // Available whether or not AI has run, so you can paste a quote you found.
+    isGlueQuote && React.createElement("div", {
+      style: { marginTop: 9, borderTop: `1px dashed ${C.border}`, paddingTop: 9 }
+    },
+      React.createElement("div", { style: { fontSize: 10.5, fontWeight: 700, color: "#92662a", marginBottom: 5 } },
+        "OR PASTE YOUR OWN QUOTE"),
+      React.createElement("textarea", {
+        value: manualText, rows: 3,
+        placeholder: "Paste the quote text…",
+        onChange: e => setManualText(e.target.value),
+        style: { width: "100%", fontSize: 12, padding: "7px 9px", borderRadius: 7,
+          border: `1.5px solid ${C.border}`, fontFamily: "Georgia,serif", resize: "vertical", marginBottom: 6 }
+      }),
+      React.createElement("input", {
+        value: manualSource,
+        placeholder: "Source — e.g. President Dallin H. Oaks, Ensign May 2026, \u201CTitle\u201D",
+        onChange: e => setManualSource(e.target.value),
+        style: { width: "100%", fontSize: 12, padding: "7px 9px", borderRadius: 7,
+          border: `1.5px solid ${C.border}`, fontFamily: "Georgia,serif", marginBottom: 6 }
+      }),
+      React.createElement("input", {
+        value: manualRef,
+        placeholder: "Scripture reference (optional) — e.g. 2 Nephi 2:25",
+        onChange: e => setManualRef(e.target.value),
+        style: { width: "100%", fontSize: 12, padding: "7px 9px", borderRadius: 7,
+          border: `1.5px solid ${C.border}`, fontFamily: "Georgia,serif", marginBottom: 8 }
+      }),
+      React.createElement("button", {
+        onClick: () => {
+          if (!manualText.trim()) return;
+          printGlueInSlips({
+            text: manualText.trim(),
+            source: manualSource.trim(),
+            scriptureRef: manualRef.trim(),
+            origin: ""
+          }, lessonRef || "");
+        },
+        disabled: !manualText.trim(),
+        style: { width: "100%", padding: "9px", borderRadius: 8,
+          cursor: manualText.trim() ? "pointer" : "not-allowed",
+          border: "none", background: manualText.trim() ? "#92662a" : "#c8bfaa",
+          color: "#fff", fontFamily: "Georgia,serif", fontSize: 12.5, fontWeight: 700 }
+      }, "\uD83D\uDDA8\uFE0F Print slips from my quote")
     ),
 
     // footer controls
@@ -3232,7 +3484,7 @@ function LessonFramingPanel({ semester, officialPdfB64, onFramedChange }) {
     segments.map((row, i) =>
       React.createElement(SkeletonRow, {
         key: row.uid, row, index: i, total: segments.length,
-        fillState: fills[row.uid],
+        fillState: fills[row.uid], lessonRef: primaryRef,
         onMove: moveSegment, onRemove: removeSegment,
         onMinutes: setMinutes, onCustom: setCustom, onFill: fillOne
       })
