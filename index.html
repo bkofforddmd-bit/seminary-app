@@ -2679,22 +2679,46 @@ function quoteSourceUrl(quote) {
 // long quotes get more room. Uses the same open/print/download fallback
 // chain as the rest of the app. Returns false only if all attempts fail.
 function buildGlueInSlipsHTML(quote, lessonRef) {
-  const len = (quote.text || "").length
-    + (quote.source || "").length + (quote.scriptureRef || "").length;
-
-  // SIZE RULES: width is fixed at 3.5in (two per row on a letter page).
-  // Height SHRINKS to fit the content (just a small padding border) and is
-  // only CAPPED at 4in — it never pads out to 4in. Font scales down as the
-  // quote gets longer so even a long quote stays within the 4in cap.
-  let qFont, srcFont, pad, lh;
-  if (len <= 110)      { qFont = 13;   srcFont = 11; pad = 9;  lh = 1.4; }
-  else if (len <= 200) { qFont = 12;   srcFont = 10.5; pad = 9; lh = 1.38; }
-  else if (len <= 320) { qFont = 10.5; srcFont = 9.5; pad = 8; lh = 1.34; }
-  else if (len <= 480) { qFont = 9;    srcFont = 8.5; pad = 8;  lh = 1.3; }
-  else                 { qFont = 7.5;  srcFont = 7;   pad = 7;  lh = 1.25; }
-
   const esc = s => String(s || "")
     .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+  // ── SIZE RULES ──
+  // • Tile width fixed at 3.5in (two per row on a letter page).
+  // • 10mm inner margin (padding) on every side, so the quote stays legible
+  //   and there's room to glue into the scripture crease.
+  // • Quote font DEFAULTS to 10px and only shrinks below 10 if a single tile
+  //   at 10px would exceed the 4in height cap — then it drops just enough
+  //   to fit. Tiles still shrink-wrap to content (no padded whitespace).
+  const PX_PER_IN = 96;
+  const MM = PX_PER_IN / 25.4;          // px per mm
+  const PAD = 10 * MM;                   // 10mm inner margin
+  const CAP_H = 4 * PX_PER_IN;           // 4in tall cap
+  const innerW = 3.5 * PX_PER_IN - 2 * PAD;  // usable text width inside margins
+
+  // Estimate the rendered height of one tile at a given quote font size.
+  // Children: ref line, quote (wraps), source (wraps), origin (wraps),
+  // plus inter-child gaps and the top/bottom padding.
+  function estimateHeight(qf) {
+    const lh = 1.4;
+    const srcF = Math.max(8, qf - 1.5);
+    const refF = 9, originF = 8;
+    // avg glyph width ~0.52*fontsize for Georgia; chars that fit per line:
+    const cpl = f => Math.max(1, Math.floor(innerW / (f * 0.52)));
+    const linesOf = (txt, f) => Math.max(1, Math.ceil((txt || "").length / cpl(f)));
+    let h = 2 * PAD;
+    h += refF * 1.2;                                   // scripture ref
+    h += linesOf("\u201C" + quote.text + "\u201D", qf) * qf * lh;  // quote
+    h += linesOf("\u2014 " + quote.source, srcF) * srcF * 1.25;     // source
+    if (quote.origin) h += linesOf(quote.origin, originF) * originF * 1.25;
+    h += 4 * 4;                                        // ~4px gaps between children
+    return h;
+  }
+
+  // Start at 10, step down only until it fits the 4in cap (floor at 6).
+  let qFont = 10;
+  while (qFont > 6 && estimateHeight(qFont) > CAP_H) qFont -= 0.5;
+  const srcFont = Math.max(8, qFont - 1.5);
+  const lh = 1.4;
 
   const slip =
     `<div class="slip">` +
@@ -2704,7 +2728,7 @@ function buildGlueInSlipsHTML(quote, lessonRef) {
       (quote.origin ? `<div class="origin">${esc(quote.origin)}</div>` : "") +
     `</div>`;
 
-  // Slips now shrink to content, so many more fit per page for short quotes.
+  // Slips shrink to content, so many fit per page for short quotes.
   // Generate enough to fill ~3 pages of the densest layout; the browser
   // paginates and only prints the pages that have slips.
   const copies = 48;
@@ -2718,10 +2742,11 @@ function buildGlueInSlipsHTML(quote, lessonRef) {
     `h1{font-size:14px;color:#2c1a0e;margin-bottom:3px}` +
     `.note{font-size:11px;color:#7a6040;margin-bottom:14px}` +
     `.grid{display:flex;flex-wrap:wrap;gap:0;align-content:flex-start}` +
-    // width fixed at 3.5in; height shrink-wraps content but is CAPPED at 4in.
-    // overflow:hidden is a final backstop so a slip can never exceed the cap.
+    // width fixed at 3.5in; height shrink-wraps but is CAPPED at 4in.
+    // 10mm inner padding gives the glue-crease margin. overflow:hidden is a
+    // final backstop so a tile can never exceed the cap.
     `.slip{width:3.5in;max-width:3.5in;max-height:4in;overflow:hidden;` +
-      `border:1px dashed #999;padding:${pad}px;break-inside:avoid;page-break-inside:avoid;` +
+      `border:1px dashed #999;padding:10mm;break-inside:avoid;page-break-inside:avoid;` +
       `display:flex;flex-direction:column;gap:4px;justify-content:flex-start}` +
     `.slip .ref{font-size:9px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:#92662a}` +
     `.slip .quote{font-size:${qFont}px;line-height:${lh};color:#1a1008}` +
@@ -2731,7 +2756,7 @@ function buildGlueInSlipsHTML(quote, lessonRef) {
       `.slip{border:1px dashed #bbb}@page{margin:.4in;size:letter}}` +
     `</style></head><body>` +
     `<h1>Glue-in slips: ${esc(quote.scriptureRef || lessonRef || "")}</h1>` +
-    `<div class="note">Print, then cut along the dashed lines (each slip fits inside scriptures: max 3.5&Prime; &times; 4&Prime;). Students glue each slip beside the scripture reference. Use your browser's Print &rarr; Save as PDF.</div>` +
+    `<div class="note">Print, then cut along the dashed lines (each slip fits inside scriptures: max 3.5&Prime; &times; 4&Prime;, with a 10mm margin for the glue crease). Students glue each slip beside the scripture reference. Use your browser's Print &rarr; Save as PDF.</div>` +
     `<div class="grid">${cells}</div>` +
     `</body></html>`;
 }
