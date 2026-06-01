@@ -695,77 +695,24 @@ async function generateLesson(lessonRef, combined, officialPdfB64) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ apiKey: key, 
       model: "claude-sonnet-4-6",
-      max_tokens: 4000,
+      max_tokens: 3000,
       system: "You are a Seminary teacher preparation assistant for The Church of Jesus Christ of Latter-day Saints with deep knowledge of the official seminary teacher manuals, General Conference talks, and scripture. Generate accurate, doctrinally sound, engaging lesson content for high school students.",
       messages: [{
         role: "user",
-        content: `${pdfContext}Generate a complete lesson plan for: "${lessonRef}"${comboNote}
+        content: `${pdfContext}Generate a lesson plan for: "${lessonRef}"${comboNote}
 
-Return ONLY valid JSON — no markdown, no backticks. Start with { end with }.
+Return ONLY valid JSON. No markdown. Start with { end with }.
 
-{
-  "title": "Engaging 6-9 word lesson title",
-  "objective": "By the end of class, students will [specific outcome]",
-  "overview": "2-3 sentence overview of doctrinal theme and lesson focus",
-  "teacherNote": "One practical tip for the teacher (1-2 sentences)",
-  "modernSummary": "Exactly 200 words. Vivid modern-language narrative of the scripture passage for teenagers. Present tense, relatable, feel alive not academic.",
-  "keyVerses": [
-    {
-      "reference": "Book Chapter:Verse",
-      "kjvText": "Complete exact KJV text",
-      "modern": "1-2 sentence natural modern paraphrase for teens",
-      "insight": "One key doctrinal insight (1 sentence)",
-      "crossRefs": ["Related scripture 1","Related scripture 2","Related scripture 3"],
-      "talkTopics": ["Youth talk topic 1","Youth talk topic 2"],
-      "manualNote": "What the seminary teacher manual emphasizes (1 sentence)"
-    }
-  ],
-  "prompts": [
-    {
-      "text": "Full discussion question",
-      "format": "class|pair|journal|think",
-      "duration": 3,
-      "deepen": "Follow-up question",
-      "tip": "Facilitation tip for teacher"
-    }
-  ],
-  "activities": [
-    {
-      "name": "Activity name",
-      "steps": "Step-by-step instructions",
-      "duration": 6,
-      "materials": "Specific materials, or None",
-      "tag": "game|object-lesson|role-play|activity",
-      "purpose": "What gospel principle this teaches"
-    }
-  ],
-  "quotes": [
-    {
-      "text": "Quote text, 40-60 words",
-      "source": "Full name, calling",
-      "year": "Year if known",
-      "topic": "Doctrinal principle this supports"
-    }
-  ],
-  "media": [
-    {
-      "title": "Exact resource title",
-      "description": "What it shows and why it helps",
-      "search": "Exact Gospel Library search phrase",
-      "duration": 4,
-      "kind": "video|image|music"
-    }
-  ],
-  "imagePrompts": [
-    {
-      "for": "What slide this image is for",
-      "prompt": "Detailed AI image prompt: style, subject, mood, lighting. LDS-appropriate."
-    }
-  ],
-  "closingThought": "2-3 sentence closing thought or invitation to act"
-}
+{"title":"","objective":"","overview":"","teacherNote":"","modernSummary":"100-word modern narrative for teens",
+"keyVerses":[{"reference":"","kjvText":"","modern":"","insight":"","crossRefs":[],"talkTopics":[],"manualNote":""}],
+"prompts":[{"text":"","format":"class|pair|journal|think","duration":3,"deepen":"","tip":""}],
+"activities":[{"name":"","steps":"","duration":6,"materials":"","tag":"game|object-lesson|role-play|activity","purpose":""}],
+"quotes":[{"text":"40-60 word quote","source":"Name, calling","year":"","topic":""}],
+"media":[{"title":"","description":"","search":"","duration":4,"kind":"video|image|music"}],
+"imagePrompts":[{"for":"","prompt":"LDS-appropriate AI image prompt"}],
+"closingThought":""}
 
-Provide: 5 keyVerses, 5 prompts (vary formats), 3 activities (varied tags), 4 quotes from apostles/prophets, 3 media, 5 imagePrompts.`
+Provide: 4 keyVerses, 4 prompts, 2 activities, 3 quotes, 2 media, 3 imagePrompts.`
       }]
     })
   });
