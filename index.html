@@ -575,7 +575,7 @@ async function callExtractAPI(messages) {
     body: JSON.stringify({
       apiKey: key,
       model: "claude-haiku-4-5-20251001",
-      max_tokens: 4096,
+      max_tokens: 8192,
       system: "You output only compact minified JSON. No spaces after colons or commas unless inside string values. No line breaks.",
       messages
     })
