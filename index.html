@@ -597,8 +597,9 @@ async function callExtractAPI(messages) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       apiKey: key,
-      model: "claude-sonnet-4-20250514",
-      max_tokens: 4000,
+      model: "claude-haiku-4-5-20251001",
+      max_tokens: 8192,
+      system: "You output only compact minified JSON. No spaces after colons or commas unless inside string values. No line breaks.",
       messages
     })
   });
@@ -693,7 +694,7 @@ async function generateLesson(lessonRef, combined, officialPdfB64) {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ apiKey: key, 
-      model: "claude-sonnet-4-20250514",
+      model: "claude-sonnet-4-6",
       max_tokens: 4000,
       system: "You are a Seminary teacher preparation assistant for The Church of Jesus Christ of Latter-day Saints with deep knowledge of the official seminary teacher manuals, General Conference talks, and scripture. Generate accurate, doctrinally sound, engaging lesson content for high school students.",
       messages: [{
@@ -1063,6 +1064,15 @@ function SetupTab({
     try {
       const parsed = await importPacingFile(file);
       // Merge parsed data, keeping any existing manual entries
+      // Fix AI day indexing: if days contains 0 but not 6,
+      // AI used 0=Mon (0-indexed) — shift all values up by 1 to match JS (0=Sun)
+      let parsedDays = (parsed.days || [1,2,3,4,5]).map(Number);
+      if (parsedDays.includes(0) && !parsedDays.includes(6)) {
+        parsedDays = parsedDays.map(d => d + 1);
+      }
+      parsedDays = parsedDays.filter(d => d >= 1 && d <= 5);
+      if (parsedDays.length === 0) parsedDays = [1,2,3,4,5];
+
       const scheduleRows = (parsed.schedule || []).map((s, i) => ({
         date: s.date,
         n: i + 1,
@@ -1072,13 +1082,44 @@ function SetupTab({
         type: s.type || "scripture",
         skip: !!s.skip
       }));
+
+      // Regenerate dates from scratch using start date + days array
+      // This avoids trusting AI-generated dates which are often off by one
+      const _startD = new Date((parsed.start || form.start) + 'T12:00:00');
+      const _endD   = new Date((parsed.end   || form.end  ) + 'T12:00:00');
+      const _days   = [...parsedDays].sort((a,b)=>a-b);
+      const reated  = [];
+      let _cur = new Date(_startD), _ri = 0;
+      while (_cur <= _endD && _ri < scheduleRows.length) {
+        if (_days.includes(_cur.getDay())) {
+          reated.push({ ...scheduleRows[_ri], date: _cur.toISOString().split('T')[0] });
+          _ri++;
+        }
+        _cur.setDate(_cur.getDate() + 1);
+      }
+      while (_ri < scheduleRows.length) reated.push(scheduleRows[_ri++]);
+      // Deduplicate: assign each row its own unique class day
+      const _seen = new Map();
+      const _classdays = [];
+      { let _dd = new Date(_startD);
+        while(_dd <= new Date(_endD.getTime() + 30*24*60*60*1000)) {
+          if(_days.includes(_dd.getDay())) _classdays.push(_dd.toISOString().split('T')[0]);
+          _dd.setDate(_dd.getDate()+1);
+        }
+      }
+      let _cdIdx = 0;
+      reated.forEach(row => {
+        while(_seen.has(_classdays[_cdIdx])) _cdIdx++;
+        if (_classdays[_cdIdx]) { row.date = _classdays[_cdIdx]; _seen.set(_classdays[_cdIdx], true); _cdIdx++; }
+      });
+
       const updated = {
         course: parsed.course || form.course,
         book: parsed.book || form.book,
         start: parsed.start || form.start,
         end: parsed.end || form.end,
-        days: parsed.days || form.days,
-        schedule: scheduleRows
+        days: _days,
+        schedule: reated
       };
       setForm(updated);
       onSave(updated);
