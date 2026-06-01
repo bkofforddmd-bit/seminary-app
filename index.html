@@ -597,7 +597,7 @@ async function callExtractAPI(messages) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       apiKey: key,
-      model: "claude-sonnet-4-20250514",
+      model: "claude-sonnet-4-6",
       max_tokens: 4000,
       messages
     })
@@ -689,7 +689,7 @@ async function generateLesson(lessonRef, combined) {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ apiKey: key, 
-      model: "claude-sonnet-4-20250514",
+      model: "claude-sonnet-4-6",
       max_tokens: 4000,
       system: "You are a Seminary teacher preparation assistant for The Church of Jesus Christ of Latter-day Saints with deep knowledge of the official seminary teacher manuals, General Conference talks, and scripture. Generate accurate, doctrinally sound, engaging lesson content for high school students.",
       messages: [{
