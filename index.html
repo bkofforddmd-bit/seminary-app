@@ -694,12 +694,15 @@ async function generateLesson(lessonRef, combined, officialPdfB64) {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ apiKey: key,
-      model: "claude-haiku-4-5-20251001",
-      max_tokens: 1500,
+      model: officialPdfB64 ? "claude-sonnet-4-6" : "claude-haiku-4-5-20251001",
+      max_tokens: officialPdfB64 ? 2000 : 1500,
       system: "You are a Seminary teacher preparation assistant for The Church of Jesus Christ of Latter-day Saints with deep knowledge of the official seminary teacher manuals, General Conference talks, and scripture. Generate accurate, doctrinally sound, engaging lesson content for high school students.",
       messages: [{
         role: "user",
-        content: (pdfContext || "") + "Generate a seminary lesson plan for: " + lessonRef + (comboNote || "") + ". Return valid JSON with fields: title, objective, overview, teacherNote, modernSummary, keyVerses (array with reference/kjvText/modern/insight), prompts (array with text/format/duration/deepen), activities (array with name/steps/duration/tag/purpose), quotes (array with text/source/year), media (array with title/search/duration/kind), imagePrompts (array with for/prompt), closingThought. Provide 3 keyVerses, 3 prompts, 2 activities, 2 quotes, 1 media, 2 imagePrompts."
+        content: officialPdfB64 ? [
+          { type: "document", source: { type: "base64", media_type: "application/pdf", data: officialPdfB64 } },
+          { type: "text", text: "Using the official Seminary lesson PDF above as your PRIMARY source, generate a lesson plan for: " + lessonRef + (comboNote || "") + ". Follow the PDF's learning objectives, activities, and doctrinal emphasis exactly. Return valid JSON with fields: title, objective, overview, teacherNote, modernSummary, keyVerses (array with reference/kjvText/modern/insight), prompts (array with text/format/duration/deepen), activities (array with name/steps/duration/tag/purpose), quotes (array with text/source/year), media (array with title/search/duration/kind), imagePrompts (array with for/prompt), closingThought. Provide 3 keyVerses, 3 prompts, 2 activities, 2 quotes, 1 media, 2 imagePrompts." }
+        ] : "Generate a seminary lesson plan for: " + lessonRef + (comboNote || "") + ". Return valid JSON with fields: title, objective, overview, teacherNote, modernSummary, keyVerses (array with reference/kjvText/modern/insight), prompts (array with text/format/duration/deepen), activities (array with name/steps/duration/tag/purpose), quotes (array with text/source/year), media (array with title/search/duration/kind), imagePrompts (array with for/prompt), closingThought. Provide 3 keyVerses, 3 prompts, 2 activities, 2 quotes, 1 media, 2 imagePrompts."
       }]
     })
   });
