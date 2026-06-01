@@ -690,7 +690,7 @@ async function generateLesson(lessonRef, combined, officialPdfB64) {
     ? "\n\nIMPORTANT: The teacher has uploaded the official Church Seminary lesson PDF. Follow its learning objectives, activities, and doctrinal emphasis closely."
     : "";
 
-  const resp = await fetch("/.netlify/functions/claude-lesson", {
+  const resp = await fetch("/.netlify/functions/claude-proxy", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ apiKey: key,
