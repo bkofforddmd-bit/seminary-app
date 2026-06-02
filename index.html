@@ -8084,7 +8084,7 @@ function render() {
     <div style="text-align:center;font-size:12px;color:#7a6040;margin-bottom:10px;font-style:italic">\${names[current]}'s turn — tap a square</div>
     <div class="ttt-grid" id="board"></div>
   </div>\`;
-  const boardEl = document.getElementById('board');
+  var boardEl = document.getElementById('board');
   board.forEach((owner, i) => {
     const p = cellPassages[i]; if (!p) return;
     const cell = document.createElement('div');
@@ -10370,35 +10370,21 @@ function launchGame(id) {
   }
   var code = scrM[1];
 
-  // Strip conflicting const declarations
-  ['SD','DM_BOOKS','BC'].forEach(function(name) {
-    var ci = code.indexOf('const ' + name + ' =');
-    if (ci < 0) return;
-    var depth = 0, started = false, i = ci;
-    for (; i < code.length; i++) {
-      var ch = code[i];
-      if (ch === '{' || ch === '[') { depth++; started = true; }
-      else if (ch === '}' || ch === ']') depth--;
-      else if (ch === ';' && depth === 0 && started) { i++; break; }
-    }
-    code = code.slice(0, ci) + code.slice(i);
-  });
-
-  // Replace let with var (avoid SyntaxError on re-injection)
-  code = code.replace(/\blet\b/g, 'var');
-
-  // Convert TOP-LEVEL (line-start) const declarations to var so relaunching a
-  // game doesn't throw "Identifier already declared". Indented consts (inside
-  // loops/blocks) are left as-is to preserve closure capture.
-  code = code.replace(/^const\b/gm, 'var');
-
   // Replace id="app" with id="_gapp" in game render output
   code = code.replace(/getElementById\('app'\)/g, "getElementById('_gapp')");
   code = code.replace(/getElementById\("app"\)/g, 'getElementById("_gapp")');
 
-  // Expose globals
-  window.SD = SD; window.DM_BOOKS = DM_BOOKS; window.BC = BC;
-  window.shuffle = shuffle; window.buildPool = buildPool;
+  // Wrap the whole game in a fresh IIFE so each launch gets its own scope.
+  // This keeps the game's own const/let block scoping intact (closures work)
+  // and prevents "Identifier already declared" errors when relaunching games.
+  // The game's inline onclick handlers need a couple of functions on window.
+  // A try/catch surfaces any runtime error in #_gapp instead of a blank panel.
+  code = '(function(){\ntry{\n' + code +
+    '\nif(typeof hideQuestion==="function")window.hideQuestion=hideQuestion;' +
+    '\nif(typeof pickAnswer==="function")window.pickAnswer=pickAnswer;' +
+    '\n}catch(__e){var __a=document.getElementById("_gapp");' +
+    'if(__a)__a.innerHTML=\'<div style="padding:20px;color:#c04030;font-size:13px;font-family:Georgia,serif"><b>\'+__e.name+\':</b> \'+__e.message+\'</div>\';}' +
+    '\n})();';
 
   // Inject
   setTimeout(function() {
