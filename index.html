@@ -10380,8 +10380,7 @@ function launchGame(id) {
   // The game's inline onclick handlers need a couple of functions on window.
   // A try/catch surfaces any runtime error in #_gapp instead of a blank panel.
   code = '(function(){\ntry{\n' + code +
-    '\nif(typeof hideQuestion==="function")window.hideQuestion=hideQuestion;' +
-    '\nif(typeof pickAnswer==="function")window.pickAnswer=pickAnswer;' +
+    '\n["render","startGame","resetGame","tapCell","dropCol","doDrop","askQuestion","addStrike","handleSteal","nextRound","revealAns","hideQuestion","pickAnswer"].forEach(function(__fn){try{var __v=eval("typeof "+__fn+"===\\"function\\"?"+__fn+":undefined");if(__v)window[__fn]=__v;}catch(__x){}});' +
     '\n}catch(__e){var __a=document.getElementById("_gapp");' +
     'if(__a)__a.innerHTML=\'<div style="padding:20px;color:#c04030;font-size:13px;font-family:Georgia,serif"><b>\'+__e.name+\':</b> \'+__e.message+\'</div>\';}' +
     '\n})();';
