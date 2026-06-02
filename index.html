@@ -2930,7 +2930,7 @@ function SemesterConfig({ semester, onSave, onReset }) {
         React.createElement("input", {
           type: "time", value: sem.startTime,
           onChange: e => set("startTime", e.target.value),
-          style: { width: "100%", fontSize: 13, padding: "7px 9px", borderRadius: 8,
+          style: { width: "100%", boxSizing: "border-box", fontSize: 13, padding: "7px 9px", borderRadius: 8,
                    border: `1.5px solid ${C.border}`, fontFamily: "Georgia,serif" }
         })
       ),
@@ -2939,7 +2939,7 @@ function SemesterConfig({ semester, onSave, onReset }) {
         React.createElement("input", {
           type: "time", value: sem.endTime,
           onChange: e => set("endTime", e.target.value),
-          style: { width: "100%", fontSize: 13, padding: "7px 9px", borderRadius: 8,
+          style: { width: "100%", boxSizing: "border-box", fontSize: 13, padding: "7px 9px", borderRadius: 8,
                    border: `1.5px solid ${C.border}`, fontFamily: "Georgia,serif" }
         })
       )
