@@ -591,9 +591,9 @@ function buildStyleSuffix(styleKey, customStyle) {
 // Call the OpenAI image proxy. Returns a base64 PNG data URL, or null on fail.
 // Mirrors the claude-proxy pattern: the proxy injects nothing, we pass the key.
 // `styleSuffix` carries the chosen per-deck art style.
-async function generateSlideImage(promptIdea, styleSuffix) {
+async function generateSlideImage(promptIdea, styleSuffix, model) {
   const key = getImageKey();
-  if (!key) return null;
+  if (!key) return { error: "No image API key set." };
   try {
     const resp = await fetch("/.netlify/functions/image-proxy", {
       method: "POST",
@@ -602,15 +602,20 @@ async function generateSlideImage(promptIdea, styleSuffix) {
         apiKey: key,
         prompt: promptIdea + " — " + (styleSuffix || (SLIDE_STYLE_PRESETS[SLIDE_STYLE_DEFAULT] + SLIDE_STYLE_COMMON)),
         size: "1536x1024",   // 16:9-ish landscape for slides
-        quality: "medium"
+        quality: "medium",
+        model: model || "gpt-image-1"
       })
     });
-    if (!resp.ok) return null;
-    const data = await resp.json();
+    let data = null;
+    try { data = await resp.json(); } catch (_) {}
+    if (!resp.ok) {
+      const msg = (data && (data.error || data.message)) || ("HTTP " + resp.status);
+      return { error: typeof msg === "string" ? msg : JSON.stringify(msg) };
+    }
     // proxy returns { b64 } (base64 PNG, no data: prefix)
-    if (data && data.b64) return "data:image/png;base64," + data.b64;
-    return null;
-  } catch (e) { return null; }
+    if (data && data.b64) return { data: "data:image/png;base64," + data.b64 };
+    return { error: (data && (data.error || data.message)) || "No image returned by the service." };
+  } catch (e) { return { error: "Network error: " + ((e && e.message) || String(e)) }; }
 }
 
 // Ask Claude to suggest an image prompt for a slide, given the scripture and
@@ -4039,6 +4044,7 @@ function LessonFramingPanel({ semester, officialPdfB64, onFramedChange }) {
   const [images, setImages] = React.useState({});
   const [imgStyle, setImgStyle] = React.useState("watercolor");
   const [imgStyleCustom, setImgStyleCustom] = React.useState("");
+  const [imgModel, setImgModel] = React.useState(() => { try { return localStorage.getItem("sem_image_model") || "gpt-image-1"; } catch (e) { return "gpt-image-1"; } });
   const styleSuffix = buildStyleSuffix(imgStyle, imgStyle === "custom" ? imgStyleCustom : "");
   const hasImageKey = !!getImageKey();
 
@@ -4142,9 +4148,9 @@ function LessonFramingPanel({ semester, officialPdfB64, onFramedChange }) {
     if (!prompt.trim()) { patchImg(row.uid, slot, { error: "Add or suggest a prompt first." }); return; }
     if (!getImageKey()) { patchImg(row.uid, slot, { error: "Add your OpenAI key below." }); return; }
     patchImg(row.uid, slot, { loading: true, error: null });
-    const data = await generateSlideImage(prompt, styleSuffix);
-    if (data) patchImg(row.uid, slot, { loading: false, data, skip: false });
-    else patchImg(row.uid, slot, { loading: false, error: "Generation failed or was declined. Try editing the prompt." });
+    const res = await generateSlideImage(prompt, styleSuffix, imgModel);
+    if (res && res.data) patchImg(row.uid, slot, { loading: false, data: res.data, skip: false, error: null });
+    else patchImg(row.uid, slot, { loading: false, error: (res && res.error) || "Generation failed. Try editing the prompt." });
   };
   // Set a user-supplied image (from upload or clipboard paste) into a slot.
   // Accepts a File/Blob; reads it as a base64 data URL so it embeds like an
@@ -4353,7 +4359,18 @@ function LessonFramingPanel({ semester, officialPdfB64, onFramedChange }) {
         value: imgStyleCustom, placeholder: "Describe the look, e.g. 'stained-glass window style'",
         onChange: e => setImgStyleCustom(e.target.value),
         style: { width: "100%", fontSize: 12, padding: "7px 9px", borderRadius: 7, border: `1.5px solid ${C.border}`, fontFamily: "Georgia,serif", marginTop: 6 }
-      })
+      }),
+      React.createElement("div", { style: { fontSize: 11, fontWeight: 700, color: C.brown, margin: "8px 0 4px" } }, "Image model"),
+      React.createElement("select", {
+        value: imgModel,
+        onChange: e => { setImgModel(e.target.value); try { localStorage.setItem("sem_image_model", e.target.value); } catch (x) {} },
+        style: { width: "100%", fontSize: 12, padding: "7px 9px", borderRadius: 7, border: `1.5px solid ${C.border}`, fontFamily: "Georgia,serif", background: "#fff" }
+      },
+        React.createElement("option", { value: "gpt-image-1" }, "gpt-image-1 (best; needs verified OpenAI org)"),
+        React.createElement("option", { value: "dall-e-3" }, "DALL·E 3 (no verification needed; faster)")
+      ),
+      React.createElement("div", { style: { fontSize: 10, color: C.muted, marginTop: 5, lineHeight: 1.45 } },
+        "If gpt-image-1 fails with a 'must be verified' error, either verify your org in the OpenAI dashboard, or switch to DALL·E 3 here.")
     ),
 
     // Phase 2/3: skeleton rows
