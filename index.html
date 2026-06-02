@@ -1954,7 +1954,7 @@ function TodayTab({
         ),
         lesson.segments.map((s, i) => /*#__PURE__*/React.createElement(Card, { key: i, style: { marginBottom: 9 } },
           /*#__PURE__*/React.createElement("div", { style: { fontWeight: 700, fontSize: 13, color: C.brown, marginBottom: 4 } },
-            (s.icon ? s.icon + " " : "") + s.name + (s.minutes ? " · " + s.minutes + " min" : "")),
+            (s.icon ? s.icon + " " : "") + s.name),
           s.ai && s.ai.teach && /*#__PURE__*/React.createElement("div", { style: { fontSize: 12.5, lineHeight: 1.55, color: C.text, marginBottom: s.ai.steps && s.ai.steps.length || s.ai.prompts && s.ai.prompts.length ? 6 : 0 } }, s.ai.teach),
           !s.ai && s.instructions && /*#__PURE__*/React.createElement("div", { style: { fontSize: 12, lineHeight: 1.5, color: C.muted } }, s.instructions),
           s.ai && s.ai.steps && s.ai.steps.length > 0 && /*#__PURE__*/React.createElement("div", { style: { marginBottom: s.ai.prompts && s.ai.prompts.length ? 6 : 0 } },
@@ -3315,11 +3315,7 @@ async function exportPptxDeck(framed, opts) {
   const refs = (framed.refs && framed.refs.length) ? framed.refs.join("   +   ") : "Seminary Lesson";
   const t = pptx.addSlide();
   applyBg(t, framed.titleImage || null, true);
-  t.addText(refs, { x: 0.6, y: 2.7, w: 12.1, h: 1.6, fontSize: 40, bold: true, color: GOLD, align: "center", fontFace: "Georgia", valign: "middle" });
-  if (framed.bodyMinutes != null) {
-    t.addText(framed.bodyMinutes + " min lesson" + (framed.ceiling ? " / " + framed.ceiling + " min available" : ""),
-      { x: 0.6, y: 4.4, w: 12.1, h: 0.6, fontSize: 16, italic: true, color: CREAM, align: "center", fontFace: "Georgia" });
-  }
+  t.addText(refs, { x: 0.6, y: 3.0, w: 12.1, h: 1.5, fontSize: 40, bold: true, color: GOLD, align: "center", fontFace: "Georgia", valign: "middle" });
 
   // Gathering (one detail slide, no divider). Instructions are teacher-facing,
   // so the slide shows only the activity name; instructions stay in the plan.
@@ -3334,13 +3330,12 @@ async function exportPptxDeck(framed, opts) {
     // Section divider slide
     const d = pptx.addSlide();
     applyBg(d, s.dividerImage || null, true);
-    d.addText(heading, { x: 0.6, y: 2.9, w: 12.1, h: 1.6, fontSize: 38, bold: true, color: GOLD, align: "center", fontFace: "Georgia", valign: "middle" });
-    if (s.minutes) d.addText(s.minutes + " min", { x: 0.6, y: 4.5, w: 12.1, h: 0.5, fontSize: 16, italic: true, color: CREAM, align: "center", fontFace: "Georgia" });
+    d.addText(heading, { x: 0.6, y: 3.0, w: 12.1, h: 1.5, fontSize: 38, bold: true, color: GOLD, align: "center", fontFace: "Georgia", valign: "middle" });
 
     // Detail slide
     const c = pptx.addSlide();
     applyBg(c, s.detailImage || null, false);
-    c.addText(heading + (s.minutes ? "  (" + s.minutes + " min)" : ""),
+    c.addText(heading,
       { x: 0.5, y: 0.4, w: 12.3, h: 0.9, fontSize: 26, bold: true, color: BROWN, fontFace: "Georgia" });
     const body = [];
     const ai = s.ai;
