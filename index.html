@@ -1954,7 +1954,7 @@ function TodayTab({
         ),
         lesson.segments.map((s, i) => /*#__PURE__*/React.createElement(Card, { key: i, style: { marginBottom: 9 } },
           /*#__PURE__*/React.createElement("div", { style: { fontWeight: 700, fontSize: 13, color: C.brown, marginBottom: 4 } },
-            (s.icon ? s.icon + " " : "") + s.name),
+            (s.icon ? s.icon + " " : "") + (s.slideTitle || s.name)),
           s.ai && s.ai.teach && /*#__PURE__*/React.createElement("div", { style: { fontSize: 12.5, lineHeight: 1.55, color: C.text, marginBottom: s.ai.steps && s.ai.steps.length || s.ai.prompts && s.ai.prompts.length ? 6 : 0 } }, s.ai.teach),
           !s.ai && s.instructions && /*#__PURE__*/React.createElement("div", { style: { fontSize: 12, lineHeight: 1.5, color: C.muted } }, s.instructions),
           s.ai && s.ai.steps && s.ai.steps.length > 0 && /*#__PURE__*/React.createElement("div", { style: { marginBottom: s.ai.prompts && s.ai.prompts.length ? 6 : 0 } },
@@ -2674,6 +2674,7 @@ const SEGMENT_TYPES = [
   {
     id: "opening_prayer",
     name: "Opening Prayer",
+    slideTitle: "Opening Prayer",
     icon: "🙏",
     defaultMinutes: 2,
     fill: "static",
@@ -2683,6 +2684,7 @@ const SEGMENT_TYPES = [
   {
     id: "intro_hook",
     name: "Intro Activity (Lesson Hook)",
+    slideTitle: "Introduction",
     icon: "🪝",
     defaultMinutes: 5,
     fill: "ai",
@@ -2691,6 +2693,7 @@ const SEGMENT_TYPES = [
   {
     id: "historical_context",
     name: "Historical Context / Background",
+    slideTitle: "Historical Background",
     icon: "🏛️",
     defaultMinutes: 5,
     fill: "ai",
@@ -2701,6 +2704,7 @@ const SEGMENT_TYPES = [
   {
     id: "companionship_study",
     name: "Companionship Scripture Study",
+    slideTitle: "Scripture Study",
     icon: "👥",
     defaultMinutes: 8,
     fill: "ai",
@@ -2709,6 +2713,7 @@ const SEGMENT_TYPES = [
   {
     id: "scripture_reading",
     name: "Scripture Reading (Whole Class)",
+    slideTitle: "Scripture Reading",
     icon: "📜",
     defaultMinutes: 6,
     fill: "ai",
@@ -2717,6 +2722,7 @@ const SEGMENT_TYPES = [
   {
     id: "object_lesson",
     name: "Object Lesson",
+    slideTitle: "Object Lesson",
     icon: "💡",
     defaultMinutes: 7,
     fill: "ai",
@@ -2725,6 +2731,7 @@ const SEGMENT_TYPES = [
   {
     id: "small_group",
     name: "Small Group Discussion",
+    slideTitle: "Discussion",
     icon: "🗣️",
     defaultMinutes: 8,
     fill: "ai",
@@ -2733,6 +2740,7 @@ const SEGMENT_TYPES = [
   {
     id: "whole_class_discussion",
     name: "Whole-Class Discussion",
+    slideTitle: "Discussion",
     icon: "💬",
     defaultMinutes: 7,
     fill: "ai",
@@ -2741,6 +2749,7 @@ const SEGMENT_TYPES = [
   {
     id: "prophets_words",
     name: "Words of Modern Prophets/Apostles + Discussion",
+    slideTitle: "Words of the Prophets",
     icon: "🎙️",
     defaultMinutes: 8,
     fill: "ai",
@@ -2749,6 +2758,7 @@ const SEGMENT_TYPES = [
   {
     id: "dm_memorization",
     name: "Doctrinal Mastery — Memorization",
+    slideTitle: "Doctrinal Mastery",
     icon: "🧠",
     defaultMinutes: 6,
     fill: "ai",
@@ -2757,6 +2767,7 @@ const SEGMENT_TYPES = [
   {
     id: "dm_application",
     name: "Doctrinal Mastery — Application",
+    slideTitle: "Doctrinal Mastery",
     icon: "⚖️",
     defaultMinutes: 7,
     fill: "ai",
@@ -2765,6 +2776,7 @@ const SEGMENT_TYPES = [
   {
     id: "glue_in",
     name: "Glue-in / Scripture Marking / Linking",
+    slideTitle: "Scripture Marking",
     icon: "✂️",
     defaultMinutes: 6,
     fill: "ai",
@@ -2773,6 +2785,7 @@ const SEGMENT_TYPES = [
   {
     id: "glue_in_quote",
     name: "Glue-in Quote (printable slips)",
+    slideTitle: "Scripture Insight",
     icon: "🖨️",
     defaultMinutes: 5,
     fill: "ai",
@@ -2781,6 +2794,7 @@ const SEGMENT_TYPES = [
   {
     id: "video",
     name: "Video",
+    slideTitle: "Video",
     icon: "🎬",
     defaultMinutes: 5,
     fill: "ai",
@@ -2789,6 +2803,7 @@ const SEGMENT_TYPES = [
   {
     id: "testimony_reflection",
     name: "Testimony / Reflection",
+    slideTitle: "Reflection",
     icon: "🕊️",
     defaultMinutes: 4,
     fill: "ai",
@@ -2797,6 +2812,7 @@ const SEGMENT_TYPES = [
   {
     id: "outro_activity",
     name: "Outro Activity",
+    slideTitle: "Activity",
     icon: "🏁",
     defaultMinutes: 5,
     fill: "ai",
@@ -2805,6 +2821,7 @@ const SEGMENT_TYPES = [
   {
     id: "closing_prayer",
     name: "Closing Prayer",
+    slideTitle: "Closing Prayer",
     icon: "🙏",
     defaultMinutes: 2,
     fill: "static",
@@ -3322,8 +3339,10 @@ async function exportPptxDeck(framed, opts) {
   }
   // Draw a rounded text-backing panel. dark=true → dark panel (for light text).
   function panel(slide, x, y, w, h, dark, hasImg) {
-    // Slightly more opaque when over an image so text pops; subtle otherwise.
-    const transparency = hasImg ? (dark ? 22 : 12) : (dark ? 0 : 100);
+    // Panels over an image use 50% transparency so the image still shows
+    // through while text stays readable. On plain slides: dark panel solid,
+    // light panel skipped (white-on-white needs none).
+    const transparency = hasImg ? 50 : (dark ? 0 : 100);
     if (!hasImg && !dark) return; // plain white slide, no panel needed
     slide.addShape(pptx.ShapeType.roundRect, {
       x, y, w, h, rectRadius: 0.12,
@@ -3353,7 +3372,7 @@ async function exportPptxDeck(framed, opts) {
   const detailSlideIndexes = [];   // track which slide files get bullet animation
 
   framed.segments.forEach((s, i) => {
-    const heading = (s.icon ? s.icon + " " : "") + s.name;
+    const heading = (s.icon ? s.icon + " " : "") + (s.slideTitle || s.name);
     // Section divider slide — bold gold heading on a dark panel over the image.
     const d = pptx.addSlide();
     const dHasImg = !!s.dividerImage;
@@ -4336,6 +4355,7 @@ function LessonFramingPanel({ semester, officialPdfB64, onFramedChange }) {
         return {
           typeId: s.typeId,
           name: s.typeId === "custom" && s.customName ? s.customName : (seg ? seg.name : s.typeId),
+          slideTitle: s.typeId === "custom" && s.customName ? s.customName : (seg && seg.slideTitle ? seg.slideTitle : (seg ? seg.name : s.typeId)),
           icon: seg ? seg.icon : "•",
           minutes: s.minutes,
           fill: seg ? seg.fill : "static",
