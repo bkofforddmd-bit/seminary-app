@@ -539,6 +539,34 @@ const {
   useRef
 } = React;
 
+// ── SHARED GAMES LIBRARY ──────────────────────────────────────────
+// Single source of truth for the built-in doctrinal-mastery games, used by
+// both the Games tab and the lesson-builder game pickers. `id` matches the
+// keys in GAME_DATA so the same launch path works everywhere.
+const GAMES_LIBRARY = [
+  { id: "ttt",    file: "game_ttt.html",             icon: "⭕", name: "Tic Tac Toe",         desc: "2 teams claim scripture squares — 3 in a row wins", players: "2 teams",   time: "~15 min" },
+  { id: "c4",     file: "game_c4.html",              icon: "🔴", name: "Connect Four",        desc: "Answer correctly to drop a token — 4 in a row wins", players: "2 teams",   time: "~20 min" },
+  { id: "plinko", file: "game_plinko.html",          icon: "🎯", name: "Plinko",              desc: "Answer a question then drop a ball through the pegs", players: "2–4 teams", time: "~25 min" },
+  { id: "feud",   file: "game_feud.html",            icon: "🎤", name: "Scripture Feud",      desc: "Family Feud style — reveal answers and steal!",      players: "2 teams",   time: "~30 min" },
+  { id: "robots", file: "game_robots.html",          icon: "🤖", name: "Rock 'Em Sock 'Em",   desc: "Answer questions to punch opponent robot — first to 3 KOs wins!", players: "2 teams", time: "~20 min" },
+  { id: "battle", file: "game_battleship.html",      icon: "⚓", name: "Scripture Battleship", desc: "Place ships and sink the fleet — answer to fire!",   players: "2 teams",   time: "~25 min" },
+  { id: "island", file: "game_forbidden_island.html", icon: "🏝", name: "Forbidden Island",    desc: "Cooperative! All teams collect 4 treasures before the island sinks.", players: "2–6 teams", time: "~30 min" },
+];
+function gameById(id) { return GAMES_LIBRARY.find(g => g.id === id) || null; }
+// Launch a built-in game in a new tab (inlined via GAME_DATA, else file).
+function launchGame(id) {
+  const b64 = (typeof GAME_DATA !== "undefined") ? GAME_DATA[id] : null;
+  if (b64) {
+    const html = atob(b64);
+    const blob = new Blob([html], { type: "text/html" });
+    const url = URL.createObjectURL(blob);
+    if (!window.open(url, "_blank")) window.location.href = url;
+    return;
+  }
+  const g = gameById(id);
+  if (g) { if (!window.open(g.file, "_blank")) window.location.href = g.file; }
+}
+
 // ── API KEY ──────────────────────────────────────────
 function getKey() {
   try {
@@ -2829,6 +2857,17 @@ const SEGMENT_TYPES = [
       "Invite a student to choose someone to offer the closing prayer, or assign on the fly based on who is present.",
   },
   {
+    id: "dm_game",
+    name: "Doctrinal Mastery Game",
+    slideTitle: "Game",
+    icon: "🎲",
+    defaultMinutes: 10,
+    fill: "static",
+    gamePicker: true,        // shows the game dropdown in the builder
+    instructions: "Play a doctrinal mastery review game with the class.",
+    desc: "Pick one of the built-in review games (Battleship, Plinko, Feud, etc.) to play as a class.",
+  },
+  {
     id: "custom",
     name: "Custom Block (Freeform)",
     icon: "✏️",
@@ -3215,6 +3254,7 @@ function buildLessonHTML(framed) {
       (f.gathering.minutes ? ` <span class="mins">(${f.gathering.minutes} min, during trickle-in)</span>` : "") +
       `</h2>` +
       (f.gathering.instructions ? `<p>${esc(f.gathering.instructions)}</p>` : "") +
+      (f.gathering.gameUrl ? `<p>▶ Launch game: <span class="url">${esc(f.gathering.gameUrl)}</span> (open in the Games tab)</p>` : "") +
       `</section>`;
   }
 
@@ -3243,6 +3283,9 @@ function buildLessonHTML(framed) {
       inner += `<div class="sub">Watch / Listen</div><ul class="media">` +
         ai.media.map(m => `<li>🎬 ${esc(m.title)} — <span class="url">${esc(m.url)}</span></li>`).join("") +
         `</ul>`;
+    }
+    if (s.gameUrl) {
+      inner += `<div class="sub">Game</div><p>▶ Launch: <span class="url">${esc(s.gameUrl)}</span> (open in the Games tab)</p>`;
     }
     sections += `<section class="block">` +
       `<h2>${s.icon ? esc(s.icon) + " " : ""}${esc(s.name)}` +
@@ -3371,6 +3414,24 @@ async function exportPptxDeck(framed, opts) {
 
   const detailSlideIndexes = [];   // track which slide files get bullet animation
 
+  // ── Height estimation for auto-pagination ──
+  // We can't render text here, so we estimate. Body panel is ~5.1in tall at
+  // y=1.75. At ~0.46in per visual line, that's ~11 lines of headroom; we budget
+  // conservatively so we split a touch early rather than overflow.
+  const BODY_HEIGHT_IN = 5.0;            // usable text height inside the panel
+  const MAX_BULLETS_PER_SLIDE = 7;       // hard cap on bullets regardless of height
+  const CHARS_PER_LINE_AT_22 = 42;       // ~chars before a 22pt line wraps in the body width
+  // Estimate how many inches one body item consumes (incl. wrap + spacing).
+  function estimateItemHeight(item) {
+    const fs = item.options && item.options.fontSize ? item.options.fontSize : 20;
+    const lineIn = (fs / 72) * 1.25;     // line height ≈ 1.25 × font size, in inches
+    const perLineChars = Math.max(18, Math.round(CHARS_PER_LINE_AT_22 * (22 / fs)));
+    const wraps = Math.max(1, Math.ceil((item.text ? item.text.length : 1) / perLineChars));
+    const before = (item.options && item.options.paraSpaceBefore ? item.options.paraSpaceBefore : 0) / 72;
+    const after = (item.options && item.options.paraSpaceAfter ? item.options.paraSpaceAfter : 0) / 72;
+    return wraps * lineIn + before + after;
+  }
+
   framed.segments.forEach((s, i) => {
     const heading = (s.icon ? s.icon + " " : "") + (s.slideTitle || s.name);
     // Section divider slide — bold gold heading on a dark panel over the image.
@@ -3380,37 +3441,59 @@ async function exportPptxDeck(framed, opts) {
     panel(d, 1.2, 2.85, 10.93, 1.8, true, dHasImg);
     d.addText(heading, { x: 1.5, y: 3.0, w: 10.33, h: 1.5, fontSize: 40, bold: true, color: GOLD, align: "center", fontFace: "Georgia", valign: "middle" });
 
-    // Detail slide — heading band on top, body panel below, image kept sharp.
-    const c = pptx.addSlide();
-    const cHasImg = !!s.detailImage;
-    applyImage(c, s.detailImage || null, false);
-    // Heading band
-    panel(c, 0.4, 0.35, 12.53, 1.0, true, cHasImg);
-    c.addText(heading, { x: 0.7, y: 0.35, w: 11.93, h: 1.0, fontSize: 28, bold: true, color: GOLD, fontFace: "Georgia", valign: "middle" });
-
-    const body = [];
+    // ── Assemble body items, tagged so discussion can force a page break. ──
     const ai = s.ai;
-    // STUDENT-FACING ONLY. Teacher material stays in the PDF/lesson plan.
+    const items = [];   // { text, options, group: "content" | "discussion" }
     if (ai && ai.slide && ai.slide.length) {
-      ai.slide.forEach(x => body.push({ text: x, options: { fontSize: 22, bold: true, color: TEXT, bullet: true, paraSpaceAfter: 12 } }));
+      ai.slide.forEach(x => items.push({ text: x, options: { fontSize: 22, bold: true, color: TEXT, bullet: true, paraSpaceAfter: 12 }, group: "content" }));
     }
     if (ai && ai.quotes && ai.quotes.length) {
       const q = ai.quotes[0];
-      body.push({ text: "\u201C" + q.text + "\u201D", options: { fontSize: 19, italic: true, color: TEXT, paraSpaceBefore: 8, paraSpaceAfter: 2 } });
-      body.push({ text: "— " + q.source + (q.scriptureRef ? " (" + q.scriptureRef + ")" : ""), options: { fontSize: 15, bold: true, color: SRC, paraSpaceAfter: 8 } });
-    }
-    if (showDiscussion && ai && ai.prompts && ai.prompts.length) {
-      ai.prompts.forEach(x => body.push({ text: x, options: { fontSize: 22, bold: true, color: BLUE, bullet: true, paraSpaceBefore: 8 } }));
+      items.push({ text: "\u201C" + q.text + "\u201D", options: { fontSize: 19, italic: true, color: TEXT, paraSpaceBefore: 8, paraSpaceAfter: 2 }, group: "content" });
+      items.push({ text: "— " + q.source + (q.scriptureRef ? " (" + q.scriptureRef + ")" : ""), options: { fontSize: 15, bold: true, color: SRC, paraSpaceAfter: 8 }, group: "content" });
     }
     if (ai && ai.media && ai.media.length) {
-      ai.media.forEach(m => body.push({ text: "🎬 " + m.title, options: { fontSize: 19, bold: true, color: BLUE, bullet: true, paraSpaceBefore: 8 } }));
+      ai.media.forEach(m => items.push({ text: "🎬 " + m.title, options: { fontSize: 19, bold: true, color: BLUE, bullet: true, paraSpaceBefore: 8 }, group: "content" }));
     }
-    if (body.length) {
-      // Body backing panel + text
-      panel(c, 0.4, 1.55, 12.53, 5.5, false, cHasImg);
-      c.addText(body, { x: 0.8, y: 1.75, w: 11.73, h: 5.1, fontFace: "Georgia", valign: "top" });
-      if (animate) detailSlideIndexes.push({ slideNumber: c._slideNum, count: body.length });
+    if (showDiscussion && ai && ai.prompts && ai.prompts.length) {
+      ai.prompts.forEach(x => items.push({ text: x, options: { fontSize: 22, bold: true, color: BLUE, bullet: true, paraSpaceBefore: 8 }, group: "discussion" }));
     }
+
+    // ── Paginate items into pages by height + bullet cap; discussion starts
+    //    a fresh page. Each page becomes its own detail slide. ──
+    const pages = [];
+    let page = [], pageHeight = 0, pageBullets = 0, lastGroup = null;
+    const flush = () => { if (page.length) { pages.push(page); page = []; pageHeight = 0; pageBullets = 0; } };
+    items.forEach(item => {
+      const h = estimateItemHeight(item);
+      const isBullet = !!(item.options && item.options.bullet);
+      const groupBreak = (item.group === "discussion" && lastGroup && lastGroup !== "discussion");
+      const overHeight = page.length && (pageHeight + h > BODY_HEIGHT_IN);
+      const overCap = isBullet && pageBullets >= MAX_BULLETS_PER_SLIDE;
+      if (groupBreak || overHeight || overCap) flush();
+      page.push(item);
+      pageHeight += h;
+      if (isBullet) pageBullets += 1;
+      lastGroup = item.group;
+    });
+    flush();
+    if (!pages.length) pages.push([]);   // ensure at least one detail slide
+
+    pages.forEach((pageItems, pageIdx) => {
+      const c = pptx.addSlide();
+      const cHasImg = !!s.detailImage;
+      applyImage(c, s.detailImage || null, false);
+      const pageHeading = heading + (pageIdx > 0 ? " (cont.)" : "");
+      // Heading band
+      panel(c, 0.4, 0.35, 12.53, 1.0, true, cHasImg);
+      c.addText(pageHeading, { x: 0.7, y: 0.35, w: 11.93, h: 1.0, fontSize: 28, bold: true, color: GOLD, fontFace: "Georgia", valign: "middle" });
+      if (pageItems.length) {
+        const body = pageItems.map(it => ({ text: it.text, options: it.options }));
+        panel(c, 0.4, 1.55, 12.53, 5.5, false, cHasImg);
+        c.addText(body, { x: 0.8, y: 1.75, w: 11.73, h: 5.1, fontFace: "Georgia", valign: "top" });
+        if (animate) detailSlideIndexes.push({ slideNumber: c._slideNum, count: body.length });
+      }
+    });
   });
 
   const safe = ((framed.refs && framed.refs[0]) || "lesson").replace(/[^\w]+/g, "-").slice(0, 40);
@@ -3453,42 +3536,73 @@ async function exportPptxDeck(framed, opts) {
 function injectBulletAnimation(slideXml, count) {
   if (!count || count < 1) return slideXml;
   if (slideXml.indexOf("<p:timing>") !== -1) return slideXml; // already has timing
-  // Find all shape ids in order; the body text shape is the last <p:sp> that
-  // contains <a:p> paragraphs. We approximate by taking the largest id on a
-  // text shape. Simpler and robust: grab the LAST <p:nvSpPr><p:cNvPr id="N">.
   const idMatches = [...slideXml.matchAll(/<p:cNvPr id="(\d+)"/g)].map(m => parseInt(m[1], 10));
   if (!idMatches.length) return slideXml;
-  const targetId = idMatches[idMatches.length - 1]; // body text shape (added last)
+  const spid = idMatches[idMatches.length - 1]; // body text shape (added last)
 
-  // Build one click "par" per paragraph index. Each par animates one paragraph
-  // (st/end build by paragraph) using a fade entrance ("appear" = set visible).
-  let clickPars = "";
+  // This mirrors the timing XML PowerPoint itself writes for an "Appear" entrance
+  // applied per-paragraph on click. Structure that matters:
+  //  • mainSeq holds one <p:par> per click (one per paragraph).
+  //  • The click is registered by the OUTER cTn carrying nodeType="clickEffect"
+  //    AND <p:cond delay="indefinite"/> — the wait-for-click lives at the same
+  //    level as nodeType, not on an inner node. The previous version put
+  //    delay="indefinite" on a plain cTn and nodeType="clickEffect" two levels
+  //    deeper with delay="0", so PowerPoint never paused and just advanced.
+  //  • inside: a <p:set> flips style.visibility to "visible" for one paragraph.
+  //  • a single <p:bldP build="p"> entry (ONE per shape, not one per paragraph)
+  //    is what tells PowerPoint to initially HIDE the paragraphs and reveal them
+  //    one click at a time.
+  // ids must be unique; we space them per paragraph.
+  let clickEffects = "";
   for (let p = 0; p < count; p++) {
-    clickPars +=
-      '<p:par><p:cTn id="' + (100 + p * 10) + '" fill="hold">' +
-        '<p:stCondLst><p:cond delay="indefinite"/></p:stCondLst>' +
-        '<p:childTnLst><p:par><p:cTn id="' + (101 + p * 10) + '" fill="hold">' +
-          '<p:stCondLst><p:cond delay="0"/></p:stCondLst>' +
-          '<p:childTnLst><p:par><p:cTn id="' + (102 + p * 10) + '" presetID="1" presetClass="entr" presetSubtype="0" fill="hold" nodeType="clickEffect">' +
-            '<p:stCondLst><p:cond delay="0"/></p:stCondLst>' +
-            '<p:childTnLst><p:set><p:cBhvr><p:cTn id="' + (103 + p * 10) + '" dur="1" fill="hold"><p:stCondLst><p:cond delay="0"/></p:stCondLst></p:cTn>' +
-              '<p:tgtEl><p:spTgt spid="' + targetId + '"><p:txEl><p:pRg st="' + p + '" end="' + p + '"/></p:txEl></p:spTgt></p:tgtEl>' +
-              '<p:attrNameLst><p:attrName>style.visibility</p:attrName></p:attrNameLst></p:cBhvr>' +
-              '<p:to><p:strVal val="visible"/></p:to></p:set>' +
-            '</p:childTnLst></p:cTn></p:par></p:childTnLst>' +
-        '</p:cTn></p:par></p:childTnLst>' +
-      '</p:cTn></p:par>';
+    const base = 10 + p * 10;
+    clickEffects +=
+      '<p:par>' +
+        '<p:cTn id="' + base + '" fill="hold" nodeType="clickEffect" presetID="1" presetClass="entr" presetSubtype="0">' +
+          '<p:stCondLst><p:cond delay="indefinite"/></p:stCondLst>' +
+          '<p:childTnLst>' +
+            '<p:set>' +
+              '<p:cBhvr>' +
+                '<p:cTn id="' + (base + 1) + '" dur="1" fill="hold">' +
+                  '<p:stCondLst><p:cond delay="0"/></p:stCondLst>' +
+                '</p:cTn>' +
+                '<p:tgtEl><p:spTgt spid="' + spid + '"><p:txEl><p:pRg st="' + p + '" end="' + p + '"/></p:txEl></p:spTgt></p:tgtEl>' +
+                '<p:attrNameLst><p:attrName>style.visibility</p:attrName></p:attrNameLst>' +
+              '</p:cBhvr>' +
+              '<p:to><p:strVal val="visible"/></p:to>' +
+            '</p:set>' +
+          '</p:childTnLst>' +
+        '</p:cTn>' +
+      '</p:par>';
   }
-  const timing =
-    '<p:timing><p:tnLst><p:par><p:cTn id="1" dur="indefinite" restart="never" nodeType="tmRoot">' +
-      '<p:childTnLst><p:seq concurrent="1" nextAc="seek"><p:cTn id="2" dur="indefinite" nodeType="mainSeq">' +
-        '<p:childTnLst>' + clickPars + '</p:childTnLst>' +
-        '<p:prevCondLst><p:cond evt="onPrev" delay="0"><p:tgtEl><p:sldTgt/></p:tgtEl></p:cond></p:prevCondLst>' +
-        '<p:nextCondLst><p:cond evt="onNext" delay="0"><p:tgtEl><p:sldTgt/></p:tgtEl></p:cond></p:nextCondLst>' +
-      '</p:cTn></p:seq></p:childTnLst>' +
-    '</p:cTn></p:par></p:tnLst></p:timing>';
 
-  // Insert the timing block immediately before </p:sld>.
+  // Build list: exactly ONE <p:bldP> per shape with build="p" reveals the
+  // shape's paragraphs one level at a time on click and initially hides them.
+  // (Emitting one per paragraph — as before — corrupts the build so PowerPoint
+  // either shows everything at once or ignores the timing entirely.)
+  const bldPars = '<p:bldP spid="' + spid + '" grpId="0" build="p"/>';
+
+  const timing =
+    '<p:timing>' +
+      '<p:tnLst>' +
+        '<p:par><p:cTn id="1" dur="indefinite" restart="never" nodeType="tmRoot">' +
+          '<p:childTnLst>' +
+            '<p:seq concurrent="1" nextAc="seek">' +
+              '<p:cTn id="2" dur="indefinite" nodeType="mainSeq">' +
+                '<p:childTnLst>' + clickEffects + '</p:childTnLst>' +
+              '</p:cTn>' +
+              '<p:prevCondLst><p:cond evt="onPrev" delay="0"><p:tgtEl><p:sldTgt/></p:tgtEl></p:cond></p:prevCondLst>' +
+              '<p:nextCondLst><p:cond evt="onNext" delay="0"><p:tgtEl><p:sldTgt/></p:tgtEl></p:cond></p:nextCondLst>' +
+            '</p:seq>' +
+          '</p:childTnLst>' +
+        '</p:cTn></p:par>' +
+      '</p:tnLst>' +
+      '<p:bldLst>' + bldPars + '</p:bldLst>' +
+    '</p:timing>';
+
+  // The <p:timing> element must come AFTER <p:clrMapOvr> (or </p:cSld>) per the
+  // slide schema. Insert immediately before </p:sld>; PowerPoint accepts it there
+  // as long as clrMapOvr (which PptxGenJS emits) precedes it.
   return slideXml.replace("</p:sld>", timing + "</p:sld>");
 }
 
@@ -3675,9 +3789,10 @@ function dehydrateSkeleton(skel) {
 //  PHASE 2: GATHERING PICKER  (pick ONE warm-up for the trickle-in window)
 //  Reads the Phase 1 GATHERING_LIBRARY / GATHERING_CATEGORIES.
 // ───────────────────────────────────────────────────────────────────
-function GatheringPicker({ value, onChange }) {
+function GatheringPicker({ value, onChange, gameId, onGameChange }) {
   const [openCat, setOpenCat] = React.useState(null);
   const chosen = GATHERING_LIBRARY.find(a => a.id === value) || null;
+  const isGameGathering = chosen && chosen.category === "game";
 
   return React.createElement(Card, { style: { marginBottom: 11 } },
     React.createElement("div", {
@@ -3697,6 +3812,28 @@ function GatheringPicker({ value, onChange }) {
         onClick: () => onChange(null),
         style: { background: "none", border: "none", color: C.muted, cursor: "pointer", fontSize: 13 }
       }, "✕")
+    ),
+
+    // When the chosen gathering is a game, let the teacher pick WHICH game.
+    isGameGathering && React.createElement("div", { style: { marginBottom: 8, padding: "8px 10px", background: "#fdf9f4", border: `1.5px solid ${C.gold}`, borderRadius: 8 } },
+      React.createElement("div", { style: { fontSize: 11, fontWeight: 700, color: C.brown, marginBottom: 4 } }, "🎲 Which game?"),
+      React.createElement("div", { style: { display: "flex", gap: 6 } },
+        React.createElement("select", {
+          value: gameId || "",
+          onChange: e => onGameChange && onGameChange(e.target.value),
+          style: { flex: 1, fontSize: 12, padding: "7px 9px", borderRadius: 7, border: `1.5px solid ${C.border}`, fontFamily: "Georgia,serif", background: "#fff" }
+        },
+          React.createElement("option", { value: "" }, "— pick a game —"),
+          GAMES_LIBRARY.map(g => React.createElement("option", { key: g.id, value: g.id }, g.icon + " " + g.name))
+        ),
+        gameId && React.createElement("button", {
+          onClick: () => launchGame(gameId),
+          style: { fontSize: 12, padding: "7px 12px", borderRadius: 7, border: "none", background: C.purple, color: "#fff", fontFamily: "Georgia,serif", fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }
+        }, "▶ Launch")
+      ),
+      gameId && (() => { const g = gameById(gameId); return g
+        ? React.createElement("div", { style: { fontSize: 10.5, color: C.muted, marginTop: 5, lineHeight: 1.45 } }, g.desc + "  ·  " + g.players + "  ·  " + g.time)
+        : null; })()
     ),
 
     GATHERING_CATEGORIES.map(cat => {
@@ -3918,6 +4055,28 @@ function SkeletonRow({ row, index, total, fill, fillState, lessonRef, onMove, on
       style: { fontSize: 11.5, color: C.muted, lineHeight: 1.5, marginBottom: 7,
         background: C.cream, borderRadius: 7, padding: "7px 9px" }
     }, seg.instructions),
+
+    // game picker (game blocks) — choose a specific built-in game
+    seg.gamePicker && React.createElement("div", { style: { marginBottom: 7 } },
+      React.createElement("div", { style: { fontSize: 11, fontWeight: 700, color: C.brown, marginBottom: 4 } }, "🎲 Choose a game"),
+      React.createElement("div", { style: { display: "flex", gap: 6 } },
+        React.createElement("select", {
+          value: row.gameId || "",
+          onChange: e => onCustom(row.uid, "gameId", e.target.value),
+          style: { flex: 1, fontSize: 12, padding: "7px 9px", borderRadius: 7, border: `1.5px solid ${C.border}`, fontFamily: "Georgia,serif", background: "#fff" }
+        },
+          React.createElement("option", { value: "" }, "— pick a game —"),
+          GAMES_LIBRARY.map(g => React.createElement("option", { key: g.id, value: g.id }, g.icon + " " + g.name))
+        ),
+        row.gameId && React.createElement("button", {
+          onClick: () => launchGame(row.gameId),
+          style: { fontSize: 12, padding: "7px 12px", borderRadius: 7, border: "none", background: C.purple, color: "#fff", fontFamily: "Georgia,serif", fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }
+        }, "▶ Launch")
+      ),
+      row.gameId && (() => { const g = gameById(row.gameId); return g
+        ? React.createElement("div", { style: { fontSize: 10.5, color: C.muted, marginTop: 5, lineHeight: 1.45 } }, g.desc + "  ·  " + g.players + "  ·  " + g.time)
+        : null; })()
+    ),
 
     // AI fill area
     isAI && React.createElement("div", { style: { marginBottom: 7 } },
@@ -4149,6 +4308,7 @@ function LessonFramingPanel({ semester, officialPdfB64, onFramedChange }) {
 
   // Phase 2: gathering + skeleton
   const [gatheringId, setGatheringId] = React.useState(null);
+  const [gatheringGameId, setGatheringGameId] = React.useState("");
   const [segments, setSegments] = React.useState([]);   // [{uid,typeId,minutes,customName,customInstructions}]
 
   // Phase 3: fill state keyed by row uid → {loading,error,data}
@@ -4337,9 +4497,25 @@ function LessonFramingPanel({ semester, officialPdfB64, onFramedChange }) {
   // ── publish framed lesson upward ──
   React.useEffect(() => {
     if (!onFramedChange) return;
+    // If the gathering is a game and a specific game is chosen, fold the game
+    // name/launch into the published gathering so it flows to plan + slides.
+    let pubGathering = gathering;
+    if (gathering && gathering.category === "game" && gatheringGameId) {
+      const g = gameById(gatheringGameId);
+      if (g) {
+        pubGathering = {
+          ...gathering,
+          name: gathering.name + " — " + g.name,
+          slideTitle: g.name,
+          gameId: g.id,
+          gameUrl: g.file,
+          instructions: "Play " + g.name + " on the TV. " + g.desc + " (" + g.players + ", " + g.time + ") Play until most of the class has arrived."
+        };
+      }
+    }
     onFramedChange({
       refs: [primaryRef.trim()].concat(extraRefs).filter(Boolean),
-      gathering,
+      gathering: pubGathering,
       ceiling,
       bodyMinutes,
       segments: segments.map(s => {
@@ -4352,21 +4528,29 @@ function LessonFramingPanel({ semester, officialPdfB64, onFramedChange }) {
         const mergedAi = aiData
           ? { ...aiData, slide: overrideLines.length ? overrideLines : aiData.slide }
           : (overrideLines.length ? { slide: overrideLines, steps: [], prompts: [], media: [], quotes: [] } : null);
+        // Game block: fold chosen game into name/slideTitle/instructions.
+        const game = (seg && seg.gamePicker && s.gameId) ? gameById(s.gameId) : null;
+        const baseName = s.typeId === "custom" && s.customName ? s.customName : (seg ? seg.name : s.typeId);
+        const baseSlideTitle = s.typeId === "custom" && s.customName ? s.customName : (seg && seg.slideTitle ? seg.slideTitle : (seg ? seg.name : s.typeId));
         return {
           typeId: s.typeId,
-          name: s.typeId === "custom" && s.customName ? s.customName : (seg ? seg.name : s.typeId),
-          slideTitle: s.typeId === "custom" && s.customName ? s.customName : (seg && seg.slideTitle ? seg.slideTitle : (seg ? seg.name : s.typeId)),
+          name: game ? (baseName + " — " + game.name) : baseName,
+          slideTitle: game ? game.name : baseSlideTitle,
           icon: seg ? seg.icon : "•",
           minutes: s.minutes,
           fill: seg ? seg.fill : "static",
-          instructions: s.typeId === "custom" ? s.customInstructions : (seg ? seg.instructions : ""),
+          instructions: game
+            ? ("Play " + game.name + ". " + game.desc + " (" + game.players + ", " + game.time + ")")
+            : (s.typeId === "custom" ? s.customInstructions : (seg ? seg.instructions : "")),
+          gameId: game ? game.id : null,
+          gameUrl: game ? game.file : null,
           ai: mergedAi,
           dividerImage: (im.divider && !im.divider.skip) ? (im.divider.data || null) : null,
           detailImage: (im.detail && !im.detail.skip) ? (im.detail.data || null) : null
         };
       })
     });
-  }, [primaryRef, segments, gatheringId, fills, images, ceiling]);
+  }, [primaryRef, segments, gatheringId, gatheringGameId, fills, images, ceiling]);
 
   // ── render ──
   return React.createElement("div", null,
@@ -4436,7 +4620,7 @@ function LessonFramingPanel({ semester, officialPdfB64, onFramedChange }) {
     ),
 
     // Phase 2: gathering
-    React.createElement(GatheringPicker, { value: gatheringId, onChange: setGatheringId }),
+    React.createElement(GatheringPicker, { value: gatheringId, onChange: setGatheringId, gameId: gatheringGameId, onGameChange: setGatheringGameId }),
 
     // Phase 2: live time bar against REAL ceiling
     React.createElement(Card, { style: { marginBottom: 11 } },
@@ -10244,15 +10428,7 @@ const GAME_LIST_DATA = [
 ];
 
 function GamesApp() {
-  const games = [
-    {id:'ttt',    file:'game_ttt.html',   icon:'⭕', name:'Tic Tac Toe',    desc:'2 teams claim scripture squares — 3 in a row wins', players:'2 teams',  time:'~15 min'},
-    {id:'c4',     file:'game_c4.html',    icon:'🔴', name:'Connect Four',   desc:'Answer correctly to drop a token — 4 in a row wins', players:'2 teams', time:'~20 min'},
-    {id:'plinko', file:'game_plinko.html',icon:'🎯', name:'Plinko',         desc:'Answer a question then drop a ball through the pegs', players:'2–4 teams',time:'~25 min'},
-    {id:'feud',   file:'game_feud.html',  icon:'🎤', name:'Scripture Feud', desc:'Family Feud style — reveal answers and steal!',      players:'2 teams',  time:'~30 min'},
-    {id:'robots', file:'game_robots.html', icon:'🤖', name:"Rock 'Em Sock 'Em",desc:'Answer questions to punch opponent robot — first to 3 KOs wins!', players:'2 teams', time:'~20 min'},
-    {id:'battle', file:'game_battleship.html',icon:'⚓',name:'Scripture Battleship',desc:'Place ships and sink the fleet — answer to fire!',  players:'2 teams',  time:'~25 min'},
-    {id:'island', file:'game_forbidden_island.html',icon:'🏝',name:'Forbidden Island',desc:'Cooperative! All teams work together to collect 4 treasures before the island sinks.',players:'2–6 teams',time:'~30 min'},
-  ];
+  const games = GAMES_LIBRARY;
   return /*#__PURE__*/React.createElement("div", {style:{padding:'16px 14px 48px',maxWidth:520,margin:'0 auto'}},
     /*#__PURE__*/React.createElement("h2", {style:{fontFamily:'Georgia,serif',fontWeight:700,fontSize:18,color:C.brown,marginBottom:5}}, "Doctrinal Mastery Games"),
     /*#__PURE__*/React.createElement("p", {style:{fontSize:13,color:C.muted,marginBottom:16,lineHeight:1.55}},
@@ -10262,17 +10438,7 @@ function GamesApp() {
       games.map(g => /*#__PURE__*/React.createElement(Card, {
         key: g.id,
         style: {cursor:'pointer'},
-        onClick: () => {
-          const b64 = GAME_DATA[g.id];
-          if (b64) {
-            const html = atob(b64);
-            const blob = new Blob([html], {type: 'text/html'});
-            const url = URL.createObjectURL(blob);
-            window.open(url, '_blank') || (window.location.href = url);
-          } else {
-            window.open(g.file, '_blank') || (window.location.href = g.file);
-          }
-        }
+        onClick: () => launchGame(g.id)
       },
         /*#__PURE__*/React.createElement("div", {style:{display:'flex',gap:11,alignItems:'center'}},
           /*#__PURE__*/React.createElement("div", {style:{fontSize:34,flexShrink:0}}, g.icon),
