@@ -10354,7 +10354,13 @@ function launchGame(id) {
   if (cssM) {
     var st = document.createElement('style');
     st.id = '_game_style';
-    st.textContent = cssM[1];
+    // The game overlay (#_game_overlay) sits at z-index 99999. The games'
+    // own question modals (.q-overlay) and toasts default to z-index 999/9999,
+    // which would render *behind* the game overlay and appear to do nothing
+    // when a tile is tapped. Force them above the game overlay.
+    st.textContent = cssM[1] +
+      '\n.q-overlay{z-index:1000000 !important;}' +
+      '\n.toast{z-index:1000001 !important;}';
     document.head.appendChild(st);
   }
 
