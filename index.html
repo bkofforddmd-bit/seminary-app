@@ -2073,6 +2073,7 @@ function BuildTab({
   const [savedMsg, setSavedMsg] = useState("");
   const [exporting, setExporting] = useState(false);
   const [showDiscussionOnSlides, setShowDiscussionOnSlides] = useState(false);
+  const [animateBullets, setAnimateBullets] = useState(true);
 
   useEffect(() => {
     if (initialLesson !== null && initialLesson !== void 0 && initialLesson.title) setRef(initialLesson.title);
@@ -2169,11 +2170,20 @@ function BuildTab({
           }),
           "Put discussion questions on the slides"
         ),
+        /*#__PURE__*/React.createElement("label", {
+          style: { display: "flex", alignItems: "center", gap: 8, cursor: "pointer", fontSize: 12, color: C.brown, marginTop: 6 }
+        },
+          /*#__PURE__*/React.createElement("input", {
+            type: "checkbox", checked: animateBullets,
+            onChange: e => setAnimateBullets(e.target.checked)
+          }),
+          "Reveal bullets one click at a time"
+        ),
         /*#__PURE__*/React.createElement("button", {
           onClick: async () => {
             if (exporting) return;
             setExporting(true);
-            await exportPptxDeck(framed, { showDiscussion: showDiscussionOnSlides });
+            await exportPptxDeck(framed, { showDiscussion: showDiscussionOnSlides, animate: animateBullets });
             setExporting(false);
           },
           disabled: exporting,
@@ -3289,87 +3299,178 @@ async function exportPptxDeck(framed, opts) {
   }
   const o = opts || {};
   const showDiscussion = !!o.showDiscussion;   // per-deck toggle: discussion Qs on slides?
-  const BROWN = "2C1A0E", GOLD = "C8A450", CREAM = "F7F0E0", TEXT = "1A1008", BLUE = "2A5F8A", SRC = "5A3800";
+  const animate = o.animate !== false;         // bullets appear on click (default on)
+  // Higher-contrast palette: near-black body, bold gold headings on deep brown.
+  const BROWN = "241308", GOLD = "D4A82C", CREAM = "FBF6EA", TEXT = "120A04", BLUE = "1C4E78", SRC = "5A3800";
+  const PANEL_DARK = "1A0E04", PANEL_LIGHT = "FFFFFF";
   const pptx = new PptxGenJS();
   pptx.defineLayout({ name: "W16x9", width: 13.333, height: 7.5 });
   pptx.layout = "W16x9";
   pptx.author = "Seminary Tools";
   pptx.title = (framed.refs && framed.refs[0]) || "Seminary Lesson";
-  const FULL = { x: 0, y: 0, w: 13.333, h: 7.5 };
 
-  // Images are generated & approved inline (per block) before export; here we
-  // just embed whatever the teacher approved. titleImage/gatheringImage are
-  // optional; each segment carries dividerImage and detailImage (or null).
-  // Helper: apply an image as background with a readability overlay.
-  // dark=true → dark overlay for light text (dividers); else light overlay.
-  function applyBg(slide, imgData, dark) {
+  // Images are generated & approved inline (per block) before export. We keep
+  // the image SHARP (no full-slide muting) and instead place a semi-opaque
+  // rounded panel behind the text only, so words stay readable over a crisp
+  // photo. applyImage just lays the image edge-to-edge.
+  function applyImage(slide, imgData, darkFallback) {
     if (imgData) {
       slide.addImage({ data: imgData, x: 0, y: 0, w: 13.333, h: 7.5, sizing: { type: "cover", w: 13.333, h: 7.5 } });
-      slide.addShape(pptx.ShapeType.rect, { ...FULL, fill: { color: dark ? "2C1A0E" : "FBF7F0", transparency: dark ? 35 : 22 }, line: { type: "none" } });
     } else {
-      slide.background = { color: dark ? BROWN : "FFFFFF" };
+      slide.background = { color: darkFallback ? BROWN : "FFFFFF" };
     }
+  }
+  // Draw a rounded text-backing panel. dark=true → dark panel (for light text).
+  function panel(slide, x, y, w, h, dark, hasImg) {
+    // Slightly more opaque when over an image so text pops; subtle otherwise.
+    const transparency = hasImg ? (dark ? 22 : 12) : (dark ? 0 : 100);
+    if (!hasImg && !dark) return; // plain white slide, no panel needed
+    slide.addShape(pptx.ShapeType.roundRect, {
+      x, y, w, h, rectRadius: 0.12,
+      fill: { color: dark ? PANEL_DARK : PANEL_LIGHT, transparency },
+      line: { type: "none" },
+      shadow: hasImg ? { type: "outer", color: "000000", opacity: 0.45, blur: 8, offset: 3, angle: 90 } : undefined
+    });
   }
 
   // Opening title slide
   const refs = (framed.refs && framed.refs.length) ? framed.refs.join("   +   ") : "Seminary Lesson";
   const t = pptx.addSlide();
-  applyBg(t, framed.titleImage || null, true);
-  t.addText(refs, { x: 0.6, y: 3.0, w: 12.1, h: 1.5, fontSize: 40, bold: true, color: GOLD, align: "center", fontFace: "Georgia", valign: "middle" });
+  applyImage(t, framed.titleImage || null, true);
+  panel(t, 1.2, 2.75, 10.93, 2.0, true, !!framed.titleImage);
+  t.addText(refs, { x: 1.5, y: 2.9, w: 10.33, h: 1.7, fontSize: 42, bold: true, color: GOLD, align: "center", fontFace: "Georgia", valign: "middle" });
 
   // Gathering (one detail slide, no divider). Instructions are teacher-facing,
   // so the slide shows only the activity name; instructions stay in the plan.
   if (framed.gathering) {
     const g = pptx.addSlide();
-    applyBg(g, framed.gatheringImage || null, false);
-    g.addText("🧩 " + framed.gathering.name, { x: 0.6, y: 3.0, w: 12.1, h: 1.4, fontSize: 32, bold: true, color: BROWN, align: "center", fontFace: "Georgia", valign: "middle" });
+    const hasImg = !!framed.gatheringImage;
+    applyImage(g, framed.gatheringImage || null, false);
+    panel(g, 1.2, 2.9, 10.93, 1.7, hasImg, hasImg);
+    g.addText("🧩 " + framed.gathering.name, { x: 1.5, y: 3.0, w: 10.33, h: 1.5, fontSize: 34, bold: true, color: hasImg ? CREAM : BROWN, align: "center", fontFace: "Georgia", valign: "middle" });
   }
+
+  const detailSlideIndexes = [];   // track which slide files get bullet animation
 
   framed.segments.forEach((s, i) => {
     const heading = (s.icon ? s.icon + " " : "") + s.name;
-    // Section divider slide
+    // Section divider slide — bold gold heading on a dark panel over the image.
     const d = pptx.addSlide();
-    applyBg(d, s.dividerImage || null, true);
-    d.addText(heading, { x: 0.6, y: 3.0, w: 12.1, h: 1.5, fontSize: 38, bold: true, color: GOLD, align: "center", fontFace: "Georgia", valign: "middle" });
+    const dHasImg = !!s.dividerImage;
+    applyImage(d, s.dividerImage || null, true);
+    panel(d, 1.2, 2.85, 10.93, 1.8, true, dHasImg);
+    d.addText(heading, { x: 1.5, y: 3.0, w: 10.33, h: 1.5, fontSize: 40, bold: true, color: GOLD, align: "center", fontFace: "Georgia", valign: "middle" });
 
-    // Detail slide
+    // Detail slide — heading band on top, body panel below, image kept sharp.
     const c = pptx.addSlide();
-    applyBg(c, s.detailImage || null, false);
-    c.addText(heading,
-      { x: 0.5, y: 0.4, w: 12.3, h: 0.9, fontSize: 26, bold: true, color: BROWN, fontFace: "Georgia" });
+    const cHasImg = !!s.detailImage;
+    applyImage(c, s.detailImage || null, false);
+    // Heading band
+    panel(c, 0.4, 0.35, 12.53, 1.0, true, cHasImg);
+    c.addText(heading, { x: 0.7, y: 0.35, w: 11.93, h: 1.0, fontSize: 28, bold: true, color: GOLD, fontFace: "Georgia", valign: "middle" });
+
     const body = [];
     const ai = s.ai;
-    // STUDENT-FACING ONLY. Teacher material (teach notes, steps, instructions)
-    // is intentionally excluded from slides — it lives in the PDF/lesson plan.
-    // The AI marks display-worthy lines in `slide`; quotes are always shown;
-    // discussion questions appear only if the per-deck toggle is on.
+    // STUDENT-FACING ONLY. Teacher material stays in the PDF/lesson plan.
     if (ai && ai.slide && ai.slide.length) {
-      ai.slide.forEach(x => body.push({ text: x, options: { fontSize: 20, color: TEXT, bullet: true, paraSpaceAfter: 8 } }));
+      ai.slide.forEach(x => body.push({ text: x, options: { fontSize: 22, bold: true, color: TEXT, bullet: true, paraSpaceAfter: 12 } }));
     }
     if (ai && ai.quotes && ai.quotes.length) {
       const q = ai.quotes[0];
-      body.push({ text: "\u201C" + q.text + "\u201D", options: { fontSize: 18, italic: true, color: TEXT, paraSpaceBefore: 6 } });
-      body.push({ text: "— " + q.source + (q.scriptureRef ? " (" + q.scriptureRef + ")" : ""), options: { fontSize: 14, color: SRC } });
+      body.push({ text: "\u201C" + q.text + "\u201D", options: { fontSize: 19, italic: true, color: TEXT, paraSpaceBefore: 8, paraSpaceAfter: 2 } });
+      body.push({ text: "— " + q.source + (q.scriptureRef ? " (" + q.scriptureRef + ")" : ""), options: { fontSize: 15, bold: true, color: SRC, paraSpaceAfter: 8 } });
     }
     if (showDiscussion && ai && ai.prompts && ai.prompts.length) {
-      ai.prompts.forEach(x => body.push({ text: x, options: { fontSize: 20, color: BLUE, bullet: true, paraSpaceBefore: 6 } }));
+      ai.prompts.forEach(x => body.push({ text: x, options: { fontSize: 22, bold: true, color: BLUE, bullet: true, paraSpaceBefore: 8 } }));
     }
     if (ai && ai.media && ai.media.length) {
-      // Show only the title on screen (clean); the link stays in the PDF/plan.
-      ai.media.forEach(m => body.push({ text: "🎬 " + m.title, options: { fontSize: 18, color: BLUE, bullet: true, paraSpaceBefore: 6 } }));
+      ai.media.forEach(m => body.push({ text: "🎬 " + m.title, options: { fontSize: 19, bold: true, color: BLUE, bullet: true, paraSpaceBefore: 8 } }));
     }
-    // If nothing is student-facing, leave the slide as just the heading + image.
-    if (body.length) c.addText(body, { x: 0.6, y: 1.5, w: 12.1, h: 5.6, fontFace: "Georgia", valign: "top" });
+    if (body.length) {
+      // Body backing panel + text
+      panel(c, 0.4, 1.55, 12.53, 5.5, false, cHasImg);
+      c.addText(body, { x: 0.8, y: 1.75, w: 11.73, h: 5.1, fontFace: "Georgia", valign: "top" });
+      if (animate) detailSlideIndexes.push({ slideNumber: c._slideNum, count: body.length });
+    }
   });
 
   const safe = ((framed.refs && framed.refs[0]) || "lesson").replace(/[^\w]+/g, "-").slice(0, 40);
   try {
+    if (animate && detailSlideIndexes.length && typeof JSZip !== "undefined") {
+      // Generate the pptx as a blob, then inject click-to-reveal animation XML
+      // into each detail slide so every bullet appears on a separate click.
+      const blob = await pptx.write({ outputType: "blob" });
+      const zip = await JSZip.loadAsync(blob);
+      for (const info of detailSlideIndexes) {
+        const path = "ppt/slides/slide" + info.slideNumber + ".xml";
+        const file = zip.file(path);
+        if (!file) continue;
+        let xml = await file.async("string");
+        xml = injectBulletAnimation(xml, info.count);
+        zip.file(path, xml);
+      }
+      const outBlob = await zip.generateAsync({ type: "blob", mimeType: "application/vnd.openxmlformats-officedocument.presentationml.presentation" });
+      const url = URL.createObjectURL(outBlob);
+      const a = document.createElement("a");
+      a.href = url; a.download = safe + "-slides.pptx";
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 3000);
+      return true;
+    }
     await pptx.writeFile({ fileName: safe + "-slides.pptx" });
     return true;
   } catch (e) {
     alert("Could not generate the slide deck: " + (e && e.message ? e.message : e));
     return false;
   }
+}
+
+// Inject PowerPoint "appear on click" entrance animation for each body
+// paragraph on a slide. PptxGenJS can't write animations, but the .pptx is a
+// zip of XML, so we add a <p:timing> block targeting the body text shape's
+// paragraphs (0..count-1), each on its own click. The body text is the LAST
+// <p:sp> on these detail slides (heading band is added before it), so we find
+// its shape id from the spTree and build a click sequence against it.
+function injectBulletAnimation(slideXml, count) {
+  if (!count || count < 1) return slideXml;
+  if (slideXml.indexOf("<p:timing>") !== -1) return slideXml; // already has timing
+  // Find all shape ids in order; the body text shape is the last <p:sp> that
+  // contains <a:p> paragraphs. We approximate by taking the largest id on a
+  // text shape. Simpler and robust: grab the LAST <p:nvSpPr><p:cNvPr id="N">.
+  const idMatches = [...slideXml.matchAll(/<p:cNvPr id="(\d+)"/g)].map(m => parseInt(m[1], 10));
+  if (!idMatches.length) return slideXml;
+  const targetId = idMatches[idMatches.length - 1]; // body text shape (added last)
+
+  // Build one click "par" per paragraph index. Each par animates one paragraph
+  // (st/end build by paragraph) using a fade entrance ("appear" = set visible).
+  let clickPars = "";
+  for (let p = 0; p < count; p++) {
+    clickPars +=
+      '<p:par><p:cTn id="' + (100 + p * 10) + '" fill="hold">' +
+        '<p:stCondLst><p:cond delay="indefinite"/></p:stCondLst>' +
+        '<p:childTnLst><p:par><p:cTn id="' + (101 + p * 10) + '" fill="hold">' +
+          '<p:stCondLst><p:cond delay="0"/></p:stCondLst>' +
+          '<p:childTnLst><p:par><p:cTn id="' + (102 + p * 10) + '" presetID="1" presetClass="entr" presetSubtype="0" fill="hold" nodeType="clickEffect">' +
+            '<p:stCondLst><p:cond delay="0"/></p:stCondLst>' +
+            '<p:childTnLst><p:set><p:cBhvr><p:cTn id="' + (103 + p * 10) + '" dur="1" fill="hold"><p:stCondLst><p:cond delay="0"/></p:stCondLst></p:cTn>' +
+              '<p:tgtEl><p:spTgt spid="' + targetId + '"><p:txEl><p:pRg st="' + p + '" end="' + p + '"/></p:txEl></p:spTgt></p:tgtEl>' +
+              '<p:attrNameLst><p:attrName>style.visibility</p:attrName></p:attrNameLst></p:cBhvr>' +
+              '<p:to><p:strVal val="visible"/></p:to></p:set>' +
+            '</p:childTnLst></p:cTn></p:par></p:childTnLst>' +
+        '</p:cTn></p:par></p:childTnLst>' +
+      '</p:cTn></p:par>';
+  }
+  const timing =
+    '<p:timing><p:tnLst><p:par><p:cTn id="1" dur="indefinite" restart="never" nodeType="tmRoot">' +
+      '<p:childTnLst><p:seq concurrent="1" nextAc="seek"><p:cTn id="2" dur="indefinite" nodeType="mainSeq">' +
+        '<p:childTnLst>' + clickPars + '</p:childTnLst>' +
+        '<p:prevCondLst><p:cond evt="onPrev" delay="0"><p:tgtEl><p:sldTgt/></p:tgtEl></p:cond></p:prevCondLst>' +
+        '<p:nextCondLst><p:cond evt="onNext" delay="0"><p:tgtEl><p:sldTgt/></p:tgtEl></p:cond></p:nextCondLst>' +
+      '</p:cTn></p:seq></p:childTnLst>' +
+    '</p:cTn></p:par></p:tnLst></p:timing>';
+
+  // Insert the timing block immediately before </p:sld>.
+  return slideXml.replace("</p:sld>", timing + "</p:sld>");
 }
 
 async function generateSegmentFill(seg, lessonRef, opts) {
