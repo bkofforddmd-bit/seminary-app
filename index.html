@@ -9552,6 +9552,16 @@ function doDrop(col){
   animId=requestAnimationFrame(step);
 }
 
+function forceAdvance(){
+  if(!dropping)return;
+  if(animId)cancelAnimationFrame(animId);
+  scores[cur]+=1000;lastScore={team:cur,pts:1000};
+  dropping=false;readyToDrop=false;
+  cur=(cur+1)%tc;render();
+  showToast('Token stuck — +1000 pts!',true);
+  setTimeout(()=>{lastScore=null;render();},2000);
+}
+
 function startGame(){passPool=shuffle(currentPool);passIdx=0;scores=Array(tc).fill(0);cur=0;readyToDrop=false;dropping=false;phase='play';render();}
 
 function render(){
@@ -9582,6 +9592,7 @@ function render(){
     </div>
     \${lastScore?\`<div style="text-align:center;padding:9px;background:\${PLC[lastScore.team]};color:#fff;border-radius:8px;margin-bottom:8px;font-family:Georgia,serif;font-weight:700;font-size:17px">+\${lastScore.pts} pts!</div>\`:''}
     \${!readyToDrop&&!dropping?\`<button class="btn-brown" onclick="askQuestion()">Answer to Drop →</button>\`:''}
+    \${dropping?\`<button class="btn-brown" style="background:#8a5a1a" onclick="forceAdvance()">Token stuck? Force advance (+1000) →</button>\`:''}
   </div>\`;
   
   const canvas=document.getElementById('plinko-canvas');
@@ -10249,6 +10260,8 @@ function buildRounds(){
   ri=0;revealed=Array(rounds[0]?.answers.length||0).fill(false);ctrl=0;strikes=0;steal=false;
 }
 
+function startGame(){ if(!rounds.length) buildRounds(); phase='play'; render(); }
+
 function revealAns(i){
   revealed[i]=true;scores[ctrl]+=rounds[ri].answers[i].pts;
   showToast('✓ +'+rounds[ri].answers[i].pts+' pts!',true);render();
@@ -10287,6 +10300,7 @@ function render(){
     return;
   }
   const cur=rounds[ri];const allRev=revealed.every(Boolean);
+  if(!cur){app.innerHTML='<div class="screen" style="padding:24px;text-align:center;color:#7a6040;font-family:Georgia,serif">No rounds available for the selected scriptures. Go back and pick more sections.</div>';return;}
   app.innerHTML=\`<div class="screen">
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-bottom:10px">
       \${[0,1].map(i=>\`<div style="padding:7px 11px;border-radius:9px;background:\${i===0?'#c8a450':'#5a8fd4'};color:#fff;display:flex;justify-content:space-between;align-items:center;opacity:\${ctrl===i?1:.55};border:\${ctrl===i?'2px solid #fff':'2px solid transparent'}"><span style="font-weight:700;font-size:11px">\${names[i]}</span><span style="font-size:20px;font-weight:700">\${scores[i]}</span></div>\`).join('')}
@@ -10386,7 +10400,7 @@ function launchGame(id) {
   // The game's inline onclick handlers need a couple of functions on window.
   // A try/catch surfaces any runtime error in #_gapp instead of a blank panel.
   code = '(function(){\ntry{\n' + code +
-    '\n["render","startGame","resetGame","tapCell","dropCol","doDrop","askQuestion","addStrike","handleSteal","nextRound","revealAns","hideQuestion","pickAnswer"].forEach(function(__fn){try{var __v=eval("typeof "+__fn+"===\\"function\\"?"+__fn+":undefined");if(__v)window[__fn]=__v;}catch(__x){}});' +
+    '\n["render","startGame","resetGame","tapCell","dropCol","doDrop","forceAdvance","askQuestion","addStrike","handleSteal","nextRound","revealAns","hideQuestion","pickAnswer"].forEach(function(__fn){try{var __v=eval("typeof "+__fn+"===\\"function\\"?"+__fn+":undefined");if(__v)window[__fn]=__v;}catch(__x){}});' +
     '\n}catch(__e){var __a=document.getElementById("_gapp");' +
     'if(__a)__a.innerHTML=\'<div style="padding:20px;color:#c04030;font-size:13px;font-family:Georgia,serif"><b>\'+__e.name+\':</b> \'+__e.message+\'</div>\';}' +
     '\n})();';
