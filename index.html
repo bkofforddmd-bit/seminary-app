@@ -10250,8 +10250,39 @@ const THEMES=[
   {title:"God's Plan",re:/(image|joy|liberty|glory|zion|heart|soul|worth)/i}
 ];
 
+// Final round ("Scenario Match"): a scenario + the reference that best fits it.
+// At runtime only scenarios whose ref is in the chosen pool are used.
+const SCENARIOS=[
+  {scenario:"A friend says they pray but never feel like God answers.",ref:"2 Nephi 32:8-9"},
+  {scenario:"Someone wonders why they exist and what God's purpose for them is.",ref:"Moses 1:39"},
+  {scenario:"A young person isn't sure the Church is led by God today.",ref:"D&C 1:30"},
+  {scenario:"A classmate asks how we can know the Book of Mormon is true.",ref:"Moroni 10:4-5"},
+  {scenario:"Someone feels their sins are too big to ever be forgiven.",ref:"Isaiah 1:18"},
+  {scenario:"A friend struggles to forgive someone who hurt them.",ref:"D&C 64:9-11"},
+  {scenario:"A teen wonders whether keeping the commandments is really worth it.",ref:"Mosiah 2:41"},
+  {scenario:"Someone asks why we serve other people.",ref:"Mosiah 2:17"},
+  {scenario:"A friend doubts whether Jesus really understands their pain.",ref:"Alma 7:11-13"},
+  {scenario:"Someone wants to know how to gain real wisdom and direction.",ref:"James 1:5-6"},
+  {scenario:"A person wonders whether faith is enough without doing anything.",ref:"James 2:17-18"},
+  {scenario:"A classmate asks why we need to be baptized.",ref:"John 3:5"},
+  {scenario:"A friend questions why we keep the Sabbath day holy.",ref:"Isaiah 58:13-14"},
+  {scenario:"Someone asks why members pay tithing.",ref:"Malachi 3:8-10"},
+  {scenario:"A teen wonders why their body matters and why they should care for it.",ref:"1 Cor. 6:19-20"},
+  {scenario:"A friend asks how they can know the doctrine is from God.",ref:"John 7:17"},
+  {scenario:"Someone feels weak and inadequate at everything they try.",ref:"Ether 12:27"},
+  {scenario:"A person wants to know what happens to those who never heard the gospel.",ref:"1 Peter 4:6"},
+  {scenario:"A friend wonders if God loves everyone equally.",ref:"2 Nephi 26:33"},
+  {scenario:"Someone asks why there had to be an Atonement.",ref:"Alma 34:9-10"},
+  {scenario:"A classmate asks where they can turn when they feel doubt or fear.",ref:"D&C 6:36"},
+  {scenario:"A teen wonders why we have living prophets.",ref:"Amos 3:7"},
+  {scenario:"A friend asks how families can be together forever.",ref:"D&C 131:1-4"},
+  {scenario:"Someone wants to know how God speaks to us personally.",ref:"D&C 8:2-3"}
+];
+
 let phase='sections',names=['Team 1','Team 2'];
 let rounds=[],ri=0,revealed=[],scores=[0,0],ctrl=0,strikes=0,steal=false;
+// Final round state
+let finalScenarios=[],finalP=0,finalQ=0,finalAns=[[],[]],finalTeam=0,finalReveal=false;
 
 function buildRounds(){
   rounds=THEMES.map(t=>{
@@ -10297,7 +10328,41 @@ function handleSteal(ok){
 }
 function nextRound(){
   if(ri<rounds.length-1){ri++;revealed=Array(rounds[ri].answers.length).fill(false);ctrl=1-ctrl;strikes=0;steal=false;render();}
-  else{phase='end';render();}
+  else{startFinal();}
+}
+
+// ===== Final round: Scenario Match =====
+function startFinal(){
+  // Only scenarios whose ref is in the chosen pool can be answered.
+  const poolRefs=new Set(currentPool.map(p=>p.ref));
+  const eligible=SCENARIOS.filter(s=>poolRefs.has(s.ref));
+  finalScenarios=shuffle(eligible).slice(0,5);
+  if(finalScenarios.length===0){phase='end';render();return;}
+  finalP=0;finalQ=0;finalAns=[[],[]];finalReveal=false;
+  // Bonus round goes to the team that's ahead (ties -> team 1)
+  finalTeam=scores[1]>scores[0]?1:0;
+  phase='final';render();
+}
+function finalPick(ref){
+  finalAns[finalP][finalQ]=ref;
+  if(finalQ<finalScenarios.length-1){finalQ++;render();}
+  else if(finalP===0){finalP=1;finalQ=0;render();} // switch to player 2
+  else{finalReveal=true;render();}                 // both done -> reveal
+}
+function finalSkip(){
+  finalAns[finalP][finalQ]=null;
+  if(finalQ<finalScenarios.length-1){finalQ++;render();}
+  else if(finalP===0){finalP=1;finalQ=0;render();}
+  else{finalReveal=true;render();}
+}
+function finishFinal(){
+  // +5 per scenario where both players picked the SAME reference
+  let matches=0;
+  for(let i=0;i<finalScenarios.length;i++){
+    if(finalAns[0][i]&&finalAns[0][i]===finalAns[1][i]) matches++;
+  }
+  scores[finalTeam]+=matches*5;
+  phase='end';render();
 }
 
 function render(){
@@ -10308,6 +10373,54 @@ function render(){
       \${[0,1].map(i=>\`<div style="margin-bottom:10px"><div style="font-size:12px;color:#7a6040;margin-bottom:4px">Team \${i+1}</div>
       <input id="n\${i}" value="\${names[i]}" style="width:100%;padding:8px 11px;border-radius:8px;border:1.5px solid #e0d4bc;font-size:14px;font-family:Georgia,serif"/></div>\`).join('')}
     </div><button class="btn-brown" onclick="names=[document.getElementById('n0').value,document.getElementById('n1').value];startGame()">Start Feud →</button></div>\`;
+    return;
+  }
+  if(phase==='final'){
+    const total=finalScenarios.length;
+    if(finalReveal){
+      let matches=0;
+      const rows=finalScenarios.map((s,i)=>{
+        const a=finalAns[0][i],b=finalAns[1][i];
+        const match=a&&a===b; if(match)matches++;
+        return \`<div style="background:#fff;border:1.5px solid \${match?'#82b89a':'#e0d4bc'};border-radius:9px;padding:9px 11px;margin-bottom:7px;text-align:left">
+          <div style="font-size:11px;color:#7a6040;margin-bottom:5px">\${i+1}. \${s.scenario}</div>
+          <div style="display:flex;gap:8px;align-items:center;justify-content:space-between">
+            <span style="font-size:12px"><b>P1:</b> \${a||'—'}</span>
+            <span style="font-size:12px"><b>P2:</b> \${b||'—'}</span>
+            <span style="font-weight:700;font-size:12px;color:\${match?'#2a6644':'#c04030'};white-space:nowrap">\${match?'✓ +5':'—'}</span>
+          </div></div>\`;
+      }).join('');
+      app.innerHTML=\`<div class="screen">
+        <div style="text-align:center;margin-bottom:12px"><div style="font-family:Georgia,serif;font-weight:700;font-size:18px;color:#2c1a0e">Scenario Match — Results</div><div style="font-size:12px;color:#7a6040">\${names[finalTeam]} • \${matches} of \${total} matched</div></div>
+        \${rows}
+        <div style="text-align:center;margin:14px 0;font-family:Georgia,serif;font-weight:700;font-size:16px;color:#2a6644">+\${matches*5} bonus points!</div>
+        <button class="btn-brown" onclick="finishFinal()">See Final Scores →</button>
+      </div>\`;
+      return;
+    }
+    const s=finalScenarios[finalQ];
+    const opts=shuffle(currentPool).slice(0,Math.min(8,currentPool.length));
+    if(!opts.find(o=>o.ref===s.ref)) opts.push(currentPool.find(o=>o.ref===s.ref));
+    opts.sort((a,b)=>a.ref.localeCompare(b.ref,undefined,{numeric:true}));
+    app.innerHTML=\`<div class="screen">
+      <div style="background:#2c1a0e;border-radius:10px;padding:10px 13px;margin-bottom:10px;text-align:center">
+        <div style="font-size:9px;color:rgba(200,164,80,.7);text-transform:uppercase;letter-spacing:.08em">Final Round • \${names[finalTeam]}</div>
+        <div style="font-family:Georgia,serif;font-weight:700;font-size:15px;color:#c8a450">Player \${finalP+1} answering — Scenario \${finalQ+1} of \${total}</div>
+      </div>
+      \${finalP===1?'<div style="text-align:center;font-size:11px;color:#7a6040;margin-bottom:8px;font-style:italic">Player 1\\'s answers are hidden until the reveal.</div>':'<div style="text-align:center;font-size:11px;color:#c04030;margin-bottom:8px;font-style:italic">Player 2 should be out of the room.</div>'}
+      <div class="card" style="margin-bottom:12px;background:#fffdf7"><div style="font-size:10px;color:#7a6040;text-transform:uppercase;letter-spacing:.08em;margin-bottom:5px">Scenario</div><div style="font-size:14px;color:#1a1008;line-height:1.5">\${s.scenario}</div></div>
+      <div style="font-size:10px;color:#7a6040;text-transform:uppercase;letter-spacing:.08em;margin-bottom:5px">Tap the reference that best fits:</div>
+      <div id="final-opts" style="display:flex;flex-direction:column;gap:5px;margin-bottom:10px"></div>
+      <button onclick="finalSkip()" style="padding:8px;border:1.5px solid #e0d4bc;border-radius:8px;cursor:pointer;background:transparent;color:#7a6040;font-size:11px;font-family:Georgia,serif;width:100%">No answer / Skip</button>
+    </div>\`;
+    const wrap=document.getElementById('final-opts');
+    opts.forEach(o=>{
+      const b=document.createElement('button');
+      b.style.cssText='padding:8px 11px;border:1.5px solid #e0d4bc;border-radius:8px;cursor:pointer;background:#fff;color:#1a1008;font-size:12px;font-weight:700;font-family:Georgia,serif;text-align:left';
+      b.textContent=o.ref;
+      b.onclick=()=>finalPick(o.ref);
+      wrap.appendChild(b);
+    });
     return;
   }
   if(phase==='end'){
@@ -10455,7 +10568,7 @@ function launchGame(id) {
   // The game's inline onclick handlers need a couple of functions on window.
   // A try/catch surfaces any runtime error in #_gapp instead of a blank panel.
   code = '(function(){\ntry{\n' + code +
-    '\n["render","startGame","resetGame","tapCell","dropCol","doDrop","forceAdvance","setTeams","askQuestion","addStrike","handleSteal","nextRound","revealAns","hideQuestion","pickAnswer"].forEach(function(__fn){try{var __v=eval("typeof "+__fn+"===\\"function\\"?"+__fn+":undefined");if(__v)window[__fn]=__v;}catch(__x){}});' +
+    '\n["render","startGame","resetGame","tapCell","dropCol","doDrop","forceAdvance","setTeams","askQuestion","addStrike","handleSteal","nextRound","revealAns","hideQuestion","pickAnswer","pickRef","startFinal","finalPick","finalSkip","finishFinal"].forEach(function(__fn){try{var __v=eval("typeof "+__fn+"===\\"function\\"?"+__fn+":undefined");if(__v)window[__fn]=__v;}catch(__x){}});' +
     '\n}catch(__e){var __a=document.getElementById("_gapp");' +
     'if(__a)__a.innerHTML=\'<div style="padding:20px;color:#c04030;font-size:13px;font-family:Georgia,serif"><b>\'+__e.name+\':</b> \'+__e.message+\'</div>\';}' +
     '\n})();';
