@@ -10548,7 +10548,22 @@ function launchGame(id) {
 
   // Header + app container
   var hdrM = gameHtml.match(/<div class="header"[^>]*>([\s\S]*?)<\/div>/);
-  ov.innerHTML = (hdrM ? hdrM[0] : '') + '<div id="_gapp" style="overflow-y:auto;max-height:calc(100vh - 50px)"></div>';
+  ov.innerHTML = (hdrM ? hdrM[0] : '') + '<div id="_gapp" style="overflow-y:auto;max-height:calc(100vh - 50px)"></div>' +
+    // Floating "Verses" reference sheet — available on every game screen.
+    '<button id="_ref_btn" style="position:fixed;right:14px;bottom:14px;z-index:1000002;border:none;border-radius:99px;padding:11px 16px;background:#2c1a0e;color:#f7eedd;font-family:Georgia,serif;font-weight:700;font-size:13px;cursor:pointer;box-shadow:0 3px 12px rgba(0,0,0,.3)">📖 Verses</button>' +
+    '<div id="_ref_panel" style="display:none;position:fixed;inset:0;z-index:1000003;background:rgba(0,0,0,.55);align-items:center;justify-content:center;padding:18px">' +
+      '<div style="background:#f7f5f0;border-radius:14px;max-width:560px;width:100%;max-height:86vh;display:flex;flex-direction:column;box-shadow:0 8px 32px rgba(0,0,0,.4)">' +
+        '<div style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1.5px solid #e0d4bc">' +
+          '<div style="font-family:Georgia,serif;font-weight:700;font-size:16px;color:#2c1a0e">📖 Doctrinal Mastery — Selected Verses</div>' +
+          '<button id="_ref_close" style="border:none;background:transparent;font-size:20px;color:#7a6040;cursor:pointer;line-height:1">✕</button>' +
+        '</div>' +
+        '<div style="padding:9px 16px;border-bottom:1px solid #ece3d0;display:flex;align-items:center;gap:8px">' +
+          '<label style="font-size:12px;color:#5a4630;font-family:Georgia,serif;cursor:pointer;display:flex;align-items:center;gap:6px"><input type="checkbox" id="_ref_phrases" checked style="cursor:pointer"/> Show key phrases</label>' +
+          '<span id="_ref_count" style="margin-left:auto;font-size:11px;color:#9a8666"></span>' +
+        '</div>' +
+        '<div id="_ref_list" style="overflow-y:auto;padding:6px 16px 16px"></div>' +
+      '</div>' +
+    '</div>';
 
   // Extract script — opening tag is \x3c so match both forms
   var scrM = gameHtml.match(/<script>([\s\S]*?)<\/script>/);
@@ -10569,6 +10584,30 @@ function launchGame(id) {
   // A try/catch surfaces any runtime error in #_gapp instead of a blank panel.
   code = '(function(){\ntry{\n' + code +
     '\n["render","startGame","resetGame","tapCell","dropCol","doDrop","forceAdvance","setTeams","askQuestion","addStrike","handleSteal","nextRound","revealAns","hideQuestion","pickAnswer","pickRef","startFinal","finalPick","finalSkip","finishFinal"].forEach(function(__fn){try{var __v=eval("typeof "+__fn+"===\\"function\\"?"+__fn+":undefined");if(__v)window[__fn]=__v;}catch(__x){}});' +
+    // Reference sheet wiring. Runs inside the game IIFE so it can read the
+    // game's own currentPool (the passages from the sections picked at setup).
+    '\ntry{(function(){' +
+    'var __btn=document.getElementById("_ref_btn"),__panel=document.getElementById("_ref_panel"),__close=document.getElementById("_ref_close"),__list=document.getElementById("_ref_list"),__cb=document.getElementById("_ref_phrases"),__cnt=document.getElementById("_ref_count");' +
+    'if(!__btn||!__panel)return;' +
+    'function __pool(){try{return (typeof currentPool!=="undefined"&&currentPool&&currentPool.length)?currentPool.slice():[];}catch(e){return [];}}' +
+    'function __draw(){' +
+      'var ps=__pool();' +
+      'if(!ps.length){__list.innerHTML=\'<div style="padding:18px 0;color:#9a8666;font-size:13px;text-align:center">No verses yet — pick sections and start the game first.</div>\';if(__cnt)__cnt.textContent="";return;}' +
+      'ps.sort(function(a,b){return String(a.ref).localeCompare(String(b.ref),undefined,{numeric:true});});' +
+      'var showP=__cb&&__cb.checked;' +
+      'if(__cnt)__cnt.textContent=ps.length+" verses";' +
+      '__list.innerHTML=ps.map(function(p){' +
+        'return \'<div style="padding:8px 0;border-bottom:1px solid #ece3d0">\'+' +
+          '\'<div style="font-weight:700;color:#2c1a0e;font-size:13px">\'+p.ref+(p.keyword?\' <span style="color:#c8a450;font-weight:700;font-size:11px">(\'+p.keyword+\')</span>\':\'\')+\'</div>\'+' +
+          '(showP?\'<div style="color:#5a4630;font-size:12.5px;line-height:1.45;margin-top:2px">\'+(p.phrase||\'\')+\'</div>\':\'\')+' +
+        '\'</div>\';' +
+      '}).join("");' +
+    '}' +
+    '__btn.onclick=function(){__panel.style.display="flex";__draw();};' +
+    '__close.onclick=function(){__panel.style.display="none";};' +
+    '__panel.onclick=function(e){if(e.target===__panel)__panel.style.display="none";};' +
+    'if(__cb)__cb.onchange=__draw;' +
+    '})();}catch(__re){}' +
     '\n}catch(__e){var __a=document.getElementById("_gapp");' +
     'if(__a)__a.innerHTML=\'<div style="padding:20px;color:#c04030;font-size:13px;font-family:Georgia,serif"><b>\'+__e.name+\':</b> \'+__e.message+\'</div>\';}' +
     '\n})();';
