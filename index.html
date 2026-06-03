@@ -2829,6 +2829,15 @@ const SEGMENT_TYPES = [
     desc: "A Church media clip or similar, with a watch-for prompt.",
   },
   {
+    id: "share_with_others",
+    name: "Share with Others (Teaching Practice)",
+    slideTitle: "Share with Others",
+    icon: "👐",
+    defaultMinutes: 9,
+    fill: "ai",
+    desc: "In companionships, students practice teaching today's scripture to a peer using a 4-part pattern — context, the scripture itself, application, and personal witness — then swap. Builds the skill of sharing the gospel with friends facing real challenges.",
+  },
+  {
     id: "testimony_reflection",
     name: "Testimony / Reflection",
     slideTitle: "Reflection",
@@ -3626,6 +3635,7 @@ async function generateSegmentFill(seg, lessonRef, opts) {
     : "";
 
   const isGlueQuote = seg.id === "glue_in_quote";
+  const isShare = seg.id === "share_with_others";
 
   const task = isGlueQuote ?
     (pdfPrimer +
@@ -3635,6 +3645,18 @@ async function generateSegmentFill(seg, lessonRef, opts) {
     `"quotes":[{"text":"the exact quote","source":"Full Name, Title (e.g. 'Russell M. Nelson, President of the Church')","origin":"talk title and conference/date, e.g. 'The Power of Spiritual Momentum, Apr 2022 General Conference'","scriptureRef":"the specific verse this pairs with, e.g. '2 Nephi 2:25'"}],` +
     `"minutesHint":${seg.minutes}}\n` +
     `Provide 2-3 quotes. Use ACCURATE, real, verifiable quotes and attributions — do not invent or paraphrase quotes. If unsure of an exact wording, choose a quote you are confident is accurate.`)
+    : isShare ?
+    (pdfPrimer +
+    `This is a "Share with Others" teaching-practice segment for a Seminary lesson on ${refLine}. ` +
+    `Students work in companionships (pairs): one student practices teaching today's scripture to their partner, who plays the role of a friend facing a real challenge; then they SWAP roles so both get to teach. ` +
+    `Target about ${seg.minutes} minutes total. The goal is for students to practice sharing the gospel the way they will with friends and (later) as missionaries, using a four-part pattern: (1) CONTEXT — briefly set up what is happening in the scripture, (2) SCRIPTURE — share/read the verse itself, (3) APPLICATION — explain how it helps with a real-life challenge, (4) WITNESS — bear a simple personal witness of the truth taught.\n\n` +
+    `Return ONLY valid JSON, no markdown/backticks/preamble:\n` +
+    `{"teach":"A worked MODEL for students to follow, showing all four parts for THIS scripture. Write it as four short labeled paragraphs the student could say aloud: 'Context: …', 'Scripture: …', 'Application: …', 'Witness: …'. Use real, accurate detail from ${refLine}. Keep each part 1-3 sentences and natural for a teenager to say.",` +
+    `"steps":["Teacher run-of-show for the pair practice, in order — e.g. pair students into companionships, assign roles, give each teacher a scenario card, set a timer for the first round (~3-4 min), then swap roles and repeat, then a brief regroup. Keep it concrete."],` +
+    `"prompts":["3-4 realistic 'who you are teaching' SCENARIOS. Each is one sentence describing a friend facing a specific trial or question this scripture genuinely speaks to (e.g. a friend who feels worthless, is anxious about the future, doubts God hears them, lost someone they love). The listening partner role-plays this friend. Make them age-appropriate for high-schoolers and clearly tied to the doctrine of ${refLine}."],` +
+    `"slide":["The four steps to PROJECT for students as their teaching scaffold — exactly these four short lines: '1. Context — what's happening in the scripture', '2. Scripture — share the verse', '3. Application — how it helps with a real challenge', '4. Witness — share why you know it's true'"],` +
+    `"minutesHint":${seg.minutes}}\n` +
+    `Be doctrinally sound and specific to ${refLine}. Do not invent quotes. The "teach" model must reflect what the passage actually says.`)
     :
     (pdfPrimer +
     `Generate content for ONLY this part of the lesson on ${refLine}:\n` +
@@ -3662,8 +3684,8 @@ async function generateSegmentFill(seg, lessonRef, opts) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       apiKey: key,
-      model: officialPdfB64 ? "claude-sonnet-4-6" : "claude-haiku-4-5-20251001",
-      max_tokens: 1400,
+      model: (officialPdfB64 || isShare) ? "claude-sonnet-4-6" : "claude-haiku-4-5-20251001",
+      max_tokens: isShare ? 1800 : 1400,
       system: sys,
       messages: [{ role: "user", content: userContent }]
     })
