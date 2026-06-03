@@ -10256,7 +10256,21 @@ let rounds=[],ri=0,revealed=[],scores=[0,0],ctrl=0,strikes=0,steal=false;
 function buildRounds(){
   rounds=THEMES.map(t=>{
     const m=shuffle(currentPool.filter(p=>t.re.test(p.phrase))).slice(0,4);
-    return{theme:t.title,answers:m.map((p,i)=>({ref:p.ref,phrase:p.phrase,pts:[40,30,20,10][i]}))};
+    const answers=m.map((p,i)=>({ref:p.ref,phrase:p.phrase,pts:[40,30,20,10][i]}));
+    // Build the teacher's tappable reference list: the real answers PLUS a few
+    // distractor references from the rest of the pool, so the on-screen list of
+    // references doesn't give away exactly which ones are on the board. Each
+    // option records the answer index it maps to, or -1 if it's a wrong answer.
+    const answerRefs=new Set(answers.map(a=>a.ref));
+    const distractors=shuffle(currentPool.filter(p=>!answerRefs.has(p.ref))).slice(0,3);
+    const opts=[
+      ...answers.map(a=>({ref:a.ref, ansIdx:-1})),
+      ...distractors.map(d=>({ref:d.ref, ansIdx:-1}))
+    ];
+    // map each option to its answer index (if any), then sort by reference text
+    opts.forEach(o=>{ o.ansIdx=answers.findIndex(a=>a.ref===o.ref); });
+    opts.sort((a,b)=>a.ref.localeCompare(b.ref,undefined,{numeric:true}));
+    return{theme:t.title,answers,options:opts};
   }).filter(r=>r.answers.length>=2);
   ri=0;revealed=Array(rounds[0]?.answers.length||0).fill(false);ctrl=0;strikes=0;steal=false;
 }
@@ -10266,6 +10280,12 @@ function startGame(){ if(!rounds.length) buildRounds(); phase='play'; render(); 
 function revealAns(i){
   revealed[i]=true;scores[ctrl]+=rounds[ri].answers[i].pts;
   showToast('✓ +'+rounds[ri].answers[i].pts+' pts!',true);render();
+}
+function pickRef(ansIdx){
+  // Teacher tapped a reference from the list. If it maps to an unrevealed answer,
+  // reveal it; if it's a distractor (not on the board), it's a strike.
+  if(ansIdx>=0){ if(!revealed[ansIdx]) revealAns(ansIdx); }
+  else { addStrike(); }
 }
 function addStrike(){strikes++;if(strikes>=3){steal=true;showToast('3 strikes — steal!',false);}else showToast('✗ Strike '+strikes+'/3',false);render();}
 function handleSteal(ok){
@@ -10314,8 +10334,8 @@ function render(){
       \${[0,1,2].map(i=>\`<div class="strike-dot \${i<strikes?'hit':''}">\${i<strikes?'✗':''}</div>\`).join('')}
     </div>
     <div id="ans-list" style="margin-bottom:10px"></div>
-    \${!allRev&&!steal?\`<div style="display:grid;grid-template-columns:repeat(\${Math.min(cur.answers.length,3)},1fr);gap:6px;margin-bottom:8px" id="reveal-btns"></div>\`:''} 
-    \${!allRev&&!steal?\`<div style="display:grid;grid-template-columns:1fr 1fr;gap:7px"><button onclick="addStrike()" style="padding:9px;border:1.5px solid #c04030;border-radius:8px;cursor:pointer;background:#fef2f2;color:#c04030;font-size:12px;font-weight:700;font-family:Georgia,serif">✗ Strike</button><button onclick="nextRound()" style="padding:9px;border:1.5px solid #e0d4bc;border-radius:8px;cursor:pointer;background:transparent;color:#7a6040;font-size:11px;font-family:Georgia,serif">Skip →</button></div>\`:''}
+    \${!allRev&&!steal?\`<div style="font-size:10px;color:#7a6040;text-transform:uppercase;letter-spacing:.08em;margin-bottom:5px">Teacher — tap the reference the team said:</div><div id="reveal-btns" style="display:flex;flex-direction:column;gap:5px;margin-bottom:8px"></div>\`:''} 
+    \${!allRev&&!steal?\`<div style="display:grid;grid-template-columns:1fr 1fr;gap:7px"><button onclick="addStrike()" style="padding:9px;border:1.5px solid #c04030;border-radius:8px;cursor:pointer;background:#fef2f2;color:#c04030;font-size:12px;font-weight:700;font-family:Georgia,serif">✗ Wrong (Strike)</button><button onclick="nextRound()" style="padding:9px;border:1.5px solid #e0d4bc;border-radius:8px;cursor:pointer;background:transparent;color:#7a6040;font-size:11px;font-family:Georgia,serif">Skip →</button></div>\`:''}
     \${steal?\`<div class="card" style="text-align:center"><div style="font-family:Georgia,serif;font-weight:700;font-size:14px;color:#2c1a0e;margin-bottom:8px">\${names[1-ctrl]}: Steal?</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:7px"><button onclick="handleSteal(true)" style="padding:9px;border:none;border-radius:7px;cursor:pointer;background:#2a6644;color:#fff;font-size:12px;font-weight:700">✓ Steal!</button><button onclick="handleSteal(false)" style="padding:9px;border:none;border-radius:7px;cursor:pointer;background:#c04030;color:#fff;font-size:12px;font-weight:700">✗ Missed</button></div></div>\`:''}
     \${allRev?\`<button class="btn-brown" onclick="nextRound()">\${ri<rounds.length-1?'Next Round →':'Final Scores →'}</button>\`:''}
   </div>\`;
@@ -10330,7 +10350,24 @@ function render(){
   });
   
   const revealBtns=document.getElementById('reveal-btns');
-  if(revealBtns){cur.answers.forEach((_,i)=>{if(!revealed[i]){const b=document.createElement('button');b.style.cssText='padding:7px;border:1.5px solid #2a6644;border-radius:7px;cursor:pointer;background:#eef7f1;color:#2a6644;font-size:10.5px;font-weight:700;font-family:Georgia,serif';b.textContent='Reveal #'+(i+1);b.onclick=()=>revealAns(i);revealBtns.appendChild(b);}});}
+  if(revealBtns){
+    // Reference-only list (no phrases) so a mirrored class screen isn't spoiled.
+    // Includes distractors; teacher taps whatever reference the team said.
+    cur.options.forEach(o=>{
+      const found = o.ansIdx>=0 && revealed[o.ansIdx];
+      const b=document.createElement('button');
+      if(found){
+        b.style.cssText='padding:8px 11px;border:1.5px solid #cfe3d6;border-radius:8px;background:#eef7f1;color:#2a6644;font-size:11.5px;font-weight:700;font-family:Georgia,serif;text-align:left;display:flex;justify-content:space-between;align-items:center;gap:8px;cursor:default;opacity:.7';
+        b.innerHTML='<span style="text-decoration:line-through">'+o.ref+'</span><span style="white-space:nowrap">✓ +'+rounds[ri].answers[o.ansIdx].pts+'</span>';
+        b.disabled=true;
+      } else {
+        b.style.cssText='padding:8px 11px;border:1.5px solid #e0d4bc;border-radius:8px;cursor:pointer;background:#fff;color:#1a1008;font-size:12px;font-weight:700;font-family:Georgia,serif;text-align:left';
+        b.textContent=o.ref;
+        b.onclick=()=>pickRef(o.ansIdx);
+      }
+      revealBtns.appendChild(b);
+    });
+  }
 }
 render();
 <\/script></body></html>`;
