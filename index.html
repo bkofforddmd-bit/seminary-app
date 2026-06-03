@@ -9563,6 +9563,7 @@ function forceAdvance(){
 }
 
 function startGame(){passPool=shuffle(currentPool);passIdx=0;scores=Array(tc).fill(0);cur=0;readyToDrop=false;dropping=false;phase='play';render();}
+function setTeams(n){tc=n;render();}
 
 function render(){
   const app=document.getElementById('app');
@@ -9571,7 +9572,7 @@ function render(){
     app.innerHTML=\`<div class="screen">
       <h3 style="font-family:Georgia,serif;font-weight:700;font-size:17px;color:#2c1a0e;margin-bottom:10px;text-align:center">Teams</h3>
       <div style="display:flex;gap:7px;margin-bottom:12px;justify-content:center">
-        \${[2,3,4].map(n=>\`<button onclick="tc=\${n};render()" style="padding:6px 14px;border-radius:8px;border:2px solid \${tc===n?'#2c1a0e':'#e0d4bc'};background:\${tc===n?'#2c1a0e':'#fff'};color:\${tc===n?'#f7eedd':'#2c1a0e'};font-family:Georgia,serif;font-weight:700;cursor:pointer;font-size:12px">\${n} Teams</button>\`).join('')}
+        \${[2,3,4].map(n=>\`<button onclick="setTeams(\${n})" style="padding:6px 14px;border-radius:8px;border:2px solid \${tc===n?'#2c1a0e':'#e0d4bc'};background:\${tc===n?'#2c1a0e':'#fff'};color:\${tc===n?'#f7eedd':'#2c1a0e'};font-family:Georgia,serif;font-weight:700;cursor:pointer;font-size:12px">\${n} Teams</button>\`).join('')}
       </div>
       \${Array.from({length:tc},(_,i)=>\`<div style="margin-bottom:9px">
         <div style="display:flex;align-items:center;gap:7px;margin-bottom:3px"><span style="width:12px;height:12px;border-radius:50%;background:\${PLC[i]};display:inline-block"></span><span style="font-size:11.5px;color:#7a6040">Team \${i+1}</span></div>
@@ -10344,7 +10345,24 @@ const GAME_HTMLS = {
 function launchGame(id) {
   var gameHtml = GAME_HTMLS[id];
   if (!gameHtml && typeof GAME_DATA !== "undefined" && GAME_DATA[id]) {
-    try { gameHtml = atob(GAME_DATA[id]); } catch (e) { gameHtml = null; }
+    try {
+      // atob() yields a Latin-1 "binary string"; re-decode as UTF-8 so emoji
+      // (🤖, 🥊, ✕, etc.) render correctly instead of as mojibake (ð¤, â).
+      var __bin = atob(GAME_DATA[id]);
+      var __bytes = new Uint8Array(__bin.length);
+      for (var __i = 0; __i < __bin.length; __i++) __bytes[__i] = __bin.charCodeAt(__i);
+      gameHtml = new TextDecoder("utf-8").decode(__bytes);
+      // These older games build their question overlay / toast dynamically with an
+      // inline "z-index:999" (or 9999), which sits *behind* the game overlay
+      // (z-index 99999), so their modals open invisibly. Raise those inline values.
+      gameHtml = gameHtml
+        .replace(/z-index:999;/g, 'z-index:1000000;')
+        .replace(/z-index:9999;/g, 'z-index:1000001;')
+        // These games' Close button calls history.back() (made for opening in a
+        // separate tab). In the in-page overlay that does nothing useful, so point
+        // it at the overlay's own closeGame().
+        .replace(/history\.back\(\)/g, 'closeGame()');
+    } catch (e) { gameHtml = null; }
   }
   if (!gameHtml) return;
 
@@ -10400,7 +10418,7 @@ function launchGame(id) {
   // The game's inline onclick handlers need a couple of functions on window.
   // A try/catch surfaces any runtime error in #_gapp instead of a blank panel.
   code = '(function(){\ntry{\n' + code +
-    '\n["render","startGame","resetGame","tapCell","dropCol","doDrop","forceAdvance","askQuestion","addStrike","handleSteal","nextRound","revealAns","hideQuestion","pickAnswer"].forEach(function(__fn){try{var __v=eval("typeof "+__fn+"===\\"function\\"?"+__fn+":undefined");if(__v)window[__fn]=__v;}catch(__x){}});' +
+    '\n["render","startGame","resetGame","tapCell","dropCol","doDrop","forceAdvance","setTeams","askQuestion","addStrike","handleSteal","nextRound","revealAns","hideQuestion","pickAnswer"].forEach(function(__fn){try{var __v=eval("typeof "+__fn+"===\\"function\\"?"+__fn+":undefined");if(__v)window[__fn]=__v;}catch(__x){}});' +
     '\n}catch(__e){var __a=document.getElementById("_gapp");' +
     'if(__a)__a.innerHTML=\'<div style="padding:20px;color:#c04030;font-size:13px;font-family:Georgia,serif"><b>\'+__e.name+\':</b> \'+__e.message+\'</div>\';}' +
     '\n})();';
